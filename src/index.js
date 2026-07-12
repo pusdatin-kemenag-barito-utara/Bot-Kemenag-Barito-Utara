@@ -5,6 +5,8 @@ const qrcodeLib = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const usePostgresAuthState = require('./db/auth_adapter');
+const db = require('./db/index');
 const pino = require('pino');
 const qrcodeTerminal = require('qrcode-terminal');
 const { handleMessage, simulateTyping } = require('./handlers/messageHandler');
@@ -27,7 +29,13 @@ let sessionStore = undefined; // undefined = MemoryStore (default express-sessio
 async function initSessionStore() {
   try {
     const { Pool } = require('pg');
-    const testPool = new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 3000 });
+    const testPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 5,                         // Maks 5 koneksi per app (cegah numpuk)
+      idleTimeoutMillis: 30000,       // Tutup koneksi idle setelah 30 detik
+      connectionTimeoutMillis: 10000, // Timeout koneksi 10 detik (server jauh butuh waktu)
+      allowExitOnIdle: true,          // Pool boleh exit jika semua idle
+    });
     
     // Test koneksi dulu sebelum pakai PgStore
     await testPool.query('SELECT 1');
@@ -932,12 +940,11 @@ io.on('connection', (socket) => {
 async function connectToWhatsApp() {
   let state, saveCreds;
   try {
-    const authState = await useMultiFileAuthState('auth_info_baileys');
+    const authState = await usePostgresAuthState(db, 'bot_kemenag_session');
     state = authState.state;
     saveCreds = authState.saveCreds;
   } catch (err) {
-    console.error('Data kredensial WhatsApp rusak. Mereset sesi...', err.message);
-    clearAuthFolder();
+    console.error('Gagal memuat sesi dari database PostgreSQL:', err.message);
     return process.exit(1);
   }
 
@@ -1181,6 +1188,40 @@ pollingInterval = setInterval(async () => {
     isPolling = false;
   }
 }, 5000);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WEBHOOK API UNTUK PENGIRIMAN PESAN REALTIME
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/send-message', async (req, res) => {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== process.env.BOT_API_KEY) {
+    return res.status(401).json({ status: 'error', message: 'Unauthorized: Invalid API Key' });
+  }
+
+  const { number, message } = req.body;
+  if (!number || !message) {
+    return res.status(400).json({ status: 'error', message: 'Missing number or message' });
+  }
+
+  if (!globalSock || connectionStatus !== 'open') {
+    return res.status(503).json({ status: 'error', message: 'WhatsApp bot is currently offline or reconnecting.' });
+  }
+
+  try {
+    // Format number: remove leading 0, replace with 62, append @s.whatsapp.net
+    let formattedNumber = number.toString().replace(/[^0-9]/g, '');
+    if (formattedNumber.startsWith('0')) {
+      formattedNumber = '62' + formattedNumber.substring(1);
+    }
+    const jid = formattedNumber + '@s.whatsapp.net';
+
+    await globalSock.sendMessage(jid, { text: message });
+    return res.json({ status: 'success', message: 'Message sent successfully via Webhook!' });
+  } catch (error) {
+    console.error('Webhook Send Error:', error);
+    return res.status(500).json({ status: 'error', message: error.message });
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // START SERVER
