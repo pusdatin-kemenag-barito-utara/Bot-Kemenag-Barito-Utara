@@ -1,5 +1,6 @@
 const db = require("../db");
 const axios = require("axios");
+const { checkFloodControl, simulateHumanPresence, parseSpintax, injectUniqueInvisibleSignature } = require("../services/antiBanService");
 
 // Fungsi untuk menjeda eksekusi (delay)
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -106,8 +107,11 @@ async function handleMessage(sock, msg) {
       [sender, false, messageType, text, msg.messageTimestamp]
     );
   } catch (err) {
-    console.error("Gagal menyimpan log pesan ke DB:", err);
+    console.error("Gagal menyimpan log pesan ke DB:", err.message);
   }
+
+  // Flood Control Check (Proteksi Anti-Ban Spam)
+  if (!checkFloodControl(sender)) return;
 
   // Abaikan pesan grup (tidak diproses lebih lanjut)
   if (isGroup) return;
@@ -119,8 +123,13 @@ async function handleMessage(sock, msg) {
       [text]
     );
     if (result.rows.length > 0) {
-      const reply = result.rows[0].response;
-      await simulateTyping(sock, sender, reply);
+      let reply = result.rows[0].response;
+      reply = parseSpintax(reply); // Parse spintax untuk variasi teks acak
+      reply = injectUniqueInvisibleSignature(reply); // Injeksi digital signature tak kasat mata unik
+
+      // Simulasikan presensi manusia (baca centang biru, mengetik, & delay acak)
+      await simulateHumanPresence(sock, sender, reply);
+
       await sock.sendMessage(sender, { text: reply });
       await db.query(
         "INSERT INTO wa_message_logs (remote_jid, is_from_me, message_type, content, timestamp) VALUES ($1, $2, $3, $4, $5)",
