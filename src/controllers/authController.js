@@ -45,24 +45,44 @@ async function login(req, res) {
 
   const adminUsername = process.env.ADMIN_USERNAME || 'admin';
   const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+  const adminPasswordPlain = process.env.ADMIN_PASSWORD;
 
-  if (!adminPasswordHash) {
-    console.error('[Auth] ADMIN_PASSWORD_HASH belum diatur di .env!');
+  if (!adminPasswordHash && !adminPasswordPlain) {
+    console.error('[Auth] ADMIN_PASSWORD_HASH atau ADMIN_PASSWORD belum diatur di .env!');
     return res.status(500).json({ success: false, message: 'Sistem autentikasi belum dikonfigurasi. Hubungi administrator.' });
   }
 
   try {
-    let resolvedHash = adminPasswordHash;
-    if (!adminPasswordHash.startsWith('$2')) {
-      try {
-        resolvedHash = Buffer.from(adminPasswordHash, 'base64').toString('utf-8');
-      } catch (e) {
-        resolvedHash = adminPasswordHash;
+    const usernameMatch = username.trim().toLowerCase() === adminUsername.trim().toLowerCase();
+    let passwordMatch = false;
+
+    // 1. Verifikasi via Bcrypt Hash dari .env
+    if (adminPasswordHash) {
+      let hashToTest = adminPasswordHash.trim();
+      // Handle jika hash di-encode base64 untuk menghindari masalah karakter '$' di VPS
+      if (!hashToTest.startsWith('$2')) {
+        try {
+          const decoded = Buffer.from(hashToTest, 'base64').toString('utf-8');
+          if (decoded.startsWith('$2')) hashToTest = decoded;
+        } catch (e) {}
+      }
+
+      if (hashToTest.startsWith('$2')) {
+        try {
+          passwordMatch = await bcrypt.compare(password, hashToTest);
+        } catch (e) {
+          passwordMatch = false;
+        }
+      } else {
+        // Jika ENV diset plain text
+        passwordMatch = (password === hashToTest);
       }
     }
 
-    const usernameMatch = username.toLowerCase() === adminUsername.toLowerCase();
-    const passwordMatch = await bcrypt.compare(password, resolvedHash);
+    // 2. Verifikasi via ADMIN_PASSWORD (jika diatur di ENV VPS)
+    if (!passwordMatch && adminPasswordPlain) {
+      passwordMatch = (password === adminPasswordPlain);
+    }
 
     if (usernameMatch && passwordMatch) {
       req.session.authenticated = true;
