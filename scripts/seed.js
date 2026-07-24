@@ -1,4 +1,4 @@
-const pool = require("./src/db/index.js");
+const pool = require("../src/db/index.js");
 
 function getCode(srvIndex, itemIndex) {
     if (itemIndex < 26) return `${srvIndex}${String.fromCharCode(65 + itemIndex)}`;
@@ -102,7 +102,6 @@ async function seed() {
         "INSERT INTO wa_auto_replies (keyword, response, is_active) VALUES ($1, $2, true)",
         [item.keyword, item.response]
       );
-      // console.log(`Disimpan: ${item.keyword}`); // di-comment agar log tidak terlalu panjang
     }
     console.log(`✅ Selesai! Sebanyak ${data.length} Auto-Reply Menu PTSP berhasil di-generate secara live dari Database.`);
 

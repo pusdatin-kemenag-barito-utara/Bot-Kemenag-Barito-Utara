@@ -1,4 +1,4 @@
-const pool = require('./src/db/index.js');
+const pool = require('../src/db/index.js');
 
 async function inspect() {
     try {
