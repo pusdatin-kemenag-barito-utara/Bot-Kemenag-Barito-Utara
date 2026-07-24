@@ -238,17 +238,23 @@ async function getTopContacts(req, res) {
 async function getChats(req, res) {
   try {
     const result = await db.query(`
+      WITH distinct_jids AS (
+        SELECT DISTINCT remote_jid FROM wa_message_logs
+        UNION
+        SELECT remote_jid FROM wa_contacts
+      )
       SELECT 
-        c.remote_jid, 
-        COALESCE(c.name, split_part(c.remote_jid, '@', 1)) as name,
+        dj.remote_jid, 
+        COALESCE(c.name, split_part(dj.remote_jid, '@', 1)) as name,
         m.content as last_message,
         m.timestamp as last_time,
         m.is_from_me as last_is_from_me
-      FROM wa_contacts c
+      FROM distinct_jids dj
+      LEFT JOIN wa_contacts c ON c.remote_jid = dj.remote_jid
       LEFT JOIN LATERAL (
         SELECT content, timestamp, is_from_me
         FROM wa_message_logs
-        WHERE remote_jid = c.remote_jid
+        WHERE remote_jid = dj.remote_jid
         ORDER BY timestamp DESC LIMIT 1
       ) m ON true
       ORDER BY m.timestamp DESC NULLS LAST
@@ -261,7 +267,16 @@ async function getChats(req, res) {
 
 async function getChatMessages(req, res) {
   try {
-    const result = await db.query("SELECT * FROM wa_message_logs WHERE remote_jid = $1 ORDER BY timestamp ASC", [req.params.jid]);
+    const result = await db.query(
+      `SELECT * FROM (
+         SELECT DISTINCT ON (is_from_me, regexp_replace(content, '[\u200B-\u200D\uFEFF]', '', 'g')) * 
+         FROM wa_message_logs 
+         WHERE remote_jid = $1 
+         ORDER BY is_from_me, regexp_replace(content, '[\u200B-\u200D\uFEFF]', '', 'g'), timestamp ASC
+       ) sub
+       ORDER BY timestamp ASC`,
+      [req.params.jid]
+    );
     res.json({ success: true, data: result.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

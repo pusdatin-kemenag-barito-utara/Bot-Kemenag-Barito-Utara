@@ -26,8 +26,9 @@ async function migrate() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         CONSTRAINT fk_remote_jid FOREIGN KEY(remote_jid) REFERENCES wa_contacts(remote_jid) ON DELETE CASCADE
       );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_uniq_msg ON wa_message_logs (remote_jid, is_from_me, content, timestamp);
     `);
-    console.log('Tabel wa_message_logs berhasil dipastikan.');
+    console.log('Tabel wa_message_logs & unique index berhasil dipastikan.');
 
     await db.query(`
       CREATE TABLE IF NOT EXISTS ptsp_whatsapp_outbox (

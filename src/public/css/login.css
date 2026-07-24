@@ -1,12 +1,18 @@
 :root {
-    --bg-base: #0b0f17;
-    --bg-card: rgba(17, 24, 39, 0.85);
-    --bg-input: rgba(31, 41, 61, 0.6);
+    --bg-base: #06090e;
+    --bg-card: rgba(13, 20, 33, 0.75);
+    --bg-card-hover: rgba(18, 28, 45, 0.85);
+    --bg-input: rgba(18, 26, 41, 0.7);
+    --bg-input-focus: rgba(22, 33, 53, 0.95);
     --accent-emerald: #10b981;
+    --accent-emerald-light: #34d399;
     --accent-teal: #0d9488;
-    --border-color: rgba(255, 255, 255, 0.08);
-    --text-main: #f3f4f6;
-    --text-secondary: #9ca3af;
+    --accent-glow: rgba(16, 185, 129, 0.25);
+    --border-color: rgba(255, 255, 255, 0.09);
+    --border-color-focus: rgba(16, 185, 129, 0.5);
+    --text-main: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
 }
 
 *, *::before, *::after {
@@ -24,50 +30,153 @@ html, body {
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    position: relative;
 }
 
+/* Dynamic Ambient Glow Objects */
 .bg-glow {
     position: fixed;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(13, 148, 136, 0.15) 0%, rgba(16, 185, 129, 0.05) 50%, transparent 70%);
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.14) 0%, rgba(13, 148, 136, 0.06) 40%, transparent 70%);
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 0;
     pointer-events: none;
+    animation: floatGlow 10s ease-in-out infinite alternate;
 }
 
+.bg-glow-secondary {
+    position: fixed;
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, rgba(52, 211, 153, 0.08) 0%, transparent 65%);
+    top: 20%;
+    left: 30%;
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(40px);
+}
+
+@keyframes floatGlow {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        transform: translate(-48%, -52%) scale(1.1);
+    }
+}
+
+/* Grid overlay background effect */
+.bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 32px 32px;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* Glassmorphism Card Container */
 .login-card {
     position: relative;
     z-index: 10;
     width: 100%;
     max-width: 420px;
-    padding: 36px 32px;
+    padding: 40px 36px;
     background: var(--bg-card);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    border-radius: 24px;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+        0 10px 30px rgba(16, 185, 129, 0.05);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+    animation: cardAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes cardAppear {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Header & Logo styling */
+.brand-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.logo-badge {
+    position: relative;
+    display: inline-block;
+    padding: 12px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 0 20px var(--accent-glow);
 }
 
 .brand-logo-img {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 12px;
-    filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.3));
+    width: 56px;
+    height: 56px;
+    display: block;
+    filter: drop-shadow(0 4px 10px rgba(16, 185, 129, 0.4));
 }
 
+.brand-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffffff 40%, #cbd5e1);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.brand-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    font-weight: 500;
+}
+
+.brand-badge-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-emerald-light);
+    margin-top: 8px;
+}
+
+/* Input Fields & Icons */
 .form-group {
-    margin-bottom: 18px;
+    margin-bottom: 20px;
 }
 
 .form-group label {
     display: block;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 6px;
+    color: #e2e8f0;
+    margin-bottom: 8px;
+    letter-spacing: 0.01em;
 }
 
 .input-wrapper {
@@ -78,62 +187,142 @@ html, body {
 
 .input-wrapper .input-icon-left {
     position: absolute;
-    left: 14px;
-    color: var(--text-secondary);
-    font-size: 14px;
+    left: 16px;
+    color: var(--text-muted);
+    font-size: 15px;
     pointer-events: none;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.input-wrapper:focus-within .input-icon-left {
+    color: var(--accent-emerald-light);
 }
 
 .toggle-password-btn {
     position: absolute;
     right: 14px;
-    background: none;
+    background: transparent;
     border: none;
-    color: var(--text-secondary);
-    font-size: 14px;
+    color: var(--text-muted);
+    font-size: 15px;
     cursor: pointer;
-    padding: 4px;
+    padding: 6px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
+    transition: color 0.2s ease, background-color 0.2s ease;
 }
 
 .toggle-password-btn:hover {
     color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 .form-control {
     width: 100%;
-    padding: 12px 40px 12px 40px;
+    padding: 13px 44px 13px 46px;
     background: var(--bg-input);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
+    border-radius: 12px;
     color: var(--text-main);
     outline: none;
     font-size: 14px;
-    transition: border-color 0.2s;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) inset;
+}
+
+.form-control::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.form-control:hover {
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .form-control:focus {
-    border-color: var(--accent-emerald);
+    background: var(--bg-input-focus);
+    border-color: var(--border-color-focus);
+    box-shadow: 
+        0 0 0 4px var(--accent-glow),
+        0 2px 4px rgba(0, 0, 0, 0.3) inset;
 }
 
+/* Alert Error Box */
+#error-box {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 12px;
+    color: #fca5a5;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 20px;
+    animation: shake 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* Submit Button */
 .btn-submit {
+    position: relative;
     width: 100%;
-    padding: 12px;
-    background: linear-gradient(135deg, var(--accent-teal), var(--accent-emerald));
-    color: #fff;
+    padding: 14px;
+    background: linear-gradient(135deg, #0d9488 0%, #10b981 100%);
+    color: #ffffff;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 14.5px;
+    letter-spacing: 0.01em;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
-    transition: all 0.2s;
+    box-shadow: 
+        0 4px 20px rgba(16, 185, 129, 0.35),
+        0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .btn-submit:hover {
-    opacity: 0.92;
-    transform: translateY(-1px);
+    box-shadow: 
+        0 6px 24px rgba(16, 185, 129, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.25) inset;
+    transform: translateY(-2px);
+    filter: brightness(1.05);
 }
+
+.btn-submit:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+}
+
+.btn-submit:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Footer / Watermark info inside login card */
+.card-footer {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
