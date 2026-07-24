@@ -16,6 +16,14 @@ async function migrate() {
     console.log('Tabel wa_contacts berhasil dipastikan.');
 
     await db.query(`
+      CREATE TABLE IF NOT EXISTS wa_sessions (
+        id VARCHAR(255) PRIMARY KEY,
+        data TEXT NOT NULL
+      );
+    `);
+    console.log('Tabel wa_sessions berhasil dipastikan.');
+
+    await db.query(`
       CREATE TABLE IF NOT EXISTS wa_message_logs (
         id SERIAL PRIMARY KEY,
         remote_jid TEXT NOT NULL,

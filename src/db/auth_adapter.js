@@ -1,6 +1,14 @@
 const { initAuthCreds, BufferJSON, proto } = require('@whiskeysockets/baileys');
 
 module.exports = async function usePostgresAuthState(pool, sessionId = 'default') {
+    // Pastikan tabel wa_sessions sudah dibuat
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS wa_sessions (
+            id VARCHAR(255) PRIMARY KEY,
+            data TEXT NOT NULL
+        )
+    `).catch(() => {});
+
     const writeData = async (data, id) => {
         const info = JSON.stringify(data, BufferJSON.replacer);
         await pool.query(

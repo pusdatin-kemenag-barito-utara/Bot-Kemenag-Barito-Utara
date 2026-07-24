@@ -32,12 +32,16 @@ async function sendMessage(req, res) {
     }
 
     const formattedTo = cleanNumber.includes('@s.whatsapp.net') ? cleanNumber : `${cleanNumber}@s.whatsapp.net`;
-    const [result] = await globalSock.onWhatsApp(formattedTo);
-    if (!result || !result.exists) {
-      return res.status(400).json({ success: false, message: 'Nomor belum terdaftar di WhatsApp' });
+    
+    let finalJid = formattedTo;
+    try {
+      const [result] = await globalSock.onWhatsApp(formattedTo);
+      if (result && result.exists && result.jid) {
+        finalJid = result.jid;
+      }
+    } catch (e) {
+      console.warn('Cek onWhatsApp gagal, menggunakan JID default:', formattedTo);
     }
-
-    const finalJid = result.jid || formattedTo;
     const rawText = text || '';
     let actualText = parseSpintax(rawText);
     actualText = injectUniqueInvisibleSignature(actualText);
