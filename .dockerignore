@@ -1,7 +1,35 @@
-node_modules/
+# Dependencies
+**/node_modules/
+
+# Build output (Astro); produced by Dockerfile stage frontend
+frontend/.astro/
+frontend/dist/
+backend/web/public/
+
+# WhatsApp Baileys Session & Credentials (VITAL: Berisi token sesi WA)
 auth_info_baileys/
+*_auth_info/
+
+# Environment Variables & Secrets
 .env
+.env*
+
+# Logs & Debugging
+logs
+*.log
+
+# Git & CI
 .git
 .gitignore
-generate-hash.js
+.github/
+
+# Docs & tooling (bukan bagian runtime)
 *.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

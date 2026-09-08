@@ -1,29 +1,15 @@
 {
   "name": "ptsp-wa-bot",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "start": "node src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node scripts/dev.mjs",
+    "dev:backend": "cd backend && air",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "typecheck": "npm --prefix frontend run typecheck"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc13",
-    "axios": "^1.17.0",
-    "bcrypt": "^6.0.0",
-    "connect-pg-simple": "^10.0.0",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.5.2",
-    "express-session": "^1.19.0",
-    "pg": "^8.21.0",
-    "pino": "^10.3.1",
-    "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0",
-    "socket.io": "^4.8.3"
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }
