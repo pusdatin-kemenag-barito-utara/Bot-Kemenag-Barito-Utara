@@ -18,11 +18,15 @@ type ContactStore struct {
 	store *Store
 }
 
-// Upsert menambahkan kontak bila belum ada (ON CONFLICT DO NOTHING).
+// Upsert menambahkan kontak bila belum ada, atau memperbarui nama bila nama baru valid dan bukan generic.
 func (s *ContactStore) Upsert(ctx context.Context, remoteJID, name string) error {
 	_, err := s.store.Exec(ctx,
 		`INSERT INTO `+s.store.q("wa_contacts")+` (remote_jid, name) VALUES ($1, $2)
-		 ON CONFLICT (remote_jid) DO NOTHING`,
+		 ON CONFLICT (remote_jid) DO UPDATE SET
+		 	name = EXCLUDED.name
+		 WHERE EXCLUDED.name IS NOT NULL 
+		   AND EXCLUDED.name != '' 
+		   AND EXCLUDED.name NOT ILIKE '%klien%'`,
 		remoteJID, name,
 	)
 	return err
@@ -81,7 +85,11 @@ func (s *ContactStore) Top(ctx context.Context) ([]TopContact, error) {
 	rows, err := s.store.Query(ctx,
 		`SELECT
 			c.remote_jid,
-			COALESCE(c.name, split_part(c.remote_jid, '@', 1)) as name,
+			CASE 
+				WHEN c.name IS NOT NULL AND c.name != '' AND c.name NOT ILIKE '%klien%' AND c.name != 'Unknown'
+				THEN c.name 
+				ELSE split_part(c.remote_jid, '@', 1) 
+			END as name,
 			COUNT(m.id) as message_count,
 			MAX(m.timestamp) as last_message
 		FROM `+s.store.q("wa_contacts")+` c

@@ -1,24 +1,57 @@
 # Dependencies
 node_modules/
+frontend/node_modules/
 
 # Frontend build artifacts (dibuild oleh Dockerfile / CI, bukan di-commit)
 frontend/.astro/
 frontend/dist/
 backend/web/public/
+web/public/
 
-# WhatsApp Baileys Session & Credentials (VITAL: Berisi token sesi WA)
+# Go Binaries & Build Artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+ptsp-wa-bot
+ptsp-wa-bot.exe
+server
+server.exe
+bin/
+backend/bin/
+*.test
+*.out
+coverage.txt
+
+# WhatsApp Session & Credentials (VITAL: Berisi token/kredensial sesi WA)
 auth_info_baileys/
 *_auth_info/
+*.session
+session/
+backend/session/
 
-# Environment Variables & Secrets
+# Environment Variables & Secrets (100% dikelola via Infisical)
 .env
 .env*
 .env.local
 .env*.local
-!.env.example
+
+# Certificates & Private Keys (VITAL: Security)
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Local Database & SQLite
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
 
 # Logs & Debugging & Air Reloader
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -29,6 +62,8 @@ backend/tmp/
 # Editor & IDE Settings
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # AI Assistants & Temporary Scripts
 .claude/
@@ -40,4 +75,5 @@ scratch/
 # OS Metadata
 .DS_Store
 Thumbs.db
-
+ehthumbs.db
+Desktop.ini

@@ -2,10 +2,25 @@ package api
 
 import (
 	"log"
+	"net/url"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/kemenag/ptsp-wa-bot/backend/internal/anti_ban"
 	"go.mau.fi/whatsmeow/types"
 )
+
+// cleanJID membersihkan dan men-decode JID dari parameter URL.
+func cleanJID(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	decoded, err := url.PathUnescape(raw)
+	if err != nil {
+		decoded = raw
+	}
+	return strings.ReplaceAll(decoded, "%40", "@")
+}
 
 // GetChats memproses GET /api/chats — daftar percakapan unik.
 func (h *Handler) GetChats(c fiber.Ctx) error {
@@ -19,7 +34,7 @@ func (h *Handler) GetChats(c fiber.Ctx) error {
 
 // GetChatMessages memproses GET /api/chats/:jid/messages.
 func (h *Handler) GetChatMessages(c fiber.Ctx) error {
-	jid := c.Params("jid")
+	jid := cleanJID(c.Params("jid"))
 	if jid == "" {
 		return errStatus(c, fiber.StatusBadRequest, "JID wajib diisi")
 	}
@@ -37,7 +52,7 @@ func (h *Handler) GetChatMessages(c fiber.Ctx) error {
 
 // DeleteChat memproses DELETE /api/chats/:jid (hapus satu chat).
 func (h *Handler) DeleteChat(c fiber.Ctx) error {
-	jid := c.Params("jid")
+	jid := cleanJID(c.Params("jid"))
 	if jid == "" {
 		return errStatus(c, fiber.StatusBadRequest, "JID wajib diisi")
 	}
@@ -65,4 +80,51 @@ func (h *Handler) DeleteAllChats(c fiber.Ctx) error {
 		h.OnNew(fiber.Map{"type": "all_chats_deleted"})
 	}
 	return c.JSON(fiber.Map{"success": true, "message": "Semua chat berhasil dihapus"})
+}
+
+// GetBotChatStatus memproses GET /api/chats/:jid/bot-status.
+func (h *Handler) GetBotChatStatus(c fiber.Ctx) error {
+	jid := cleanJID(c.Params("jid"))
+	if jid == "" {
+		return errStatus(c, fiber.StatusBadRequest, "JID wajib diisi")
+	}
+	botCtrl := anti_ban.GetBotControl()
+	isMuted, until, reason := botCtrl.IsMuted(jid)
+	isOptOut := botCtrl.IsOptedOut(jid)
+
+	var untilTs int64
+	if isMuted {
+		untilTs = until.Unix()
+	}
+
+	return c.JSON(fiber.Map{
+		"success":     true,
+		"jid":         jid,
+		"is_muted":    isMuted,
+		"muted_until": untilTs,
+		"reason":      reason,
+		"is_opt_out":  isOptOut,
+	})
+}
+
+// ToggleBotChat memproses POST /api/chats/:jid/bot-toggle.
+func (h *Handler) ToggleBotChat(c fiber.Ctx) error {
+	jid := cleanJID(c.Params("jid"))
+	if jid == "" {
+		return errStatus(c, fiber.StatusBadRequest, "JID wajib diisi")
+	}
+	botCtrl := anti_ban.GetBotControl()
+	nowMuted := botCtrl.ToggleMute(jid)
+
+	msg := "Bot diaktifkan kembali untuk kontak ini"
+	if nowMuted {
+		msg = "Bot dijeda untuk kontak ini selama 30 menit"
+	}
+
+	return c.JSON(fiber.Map{
+		"success":  true,
+		"jid":      jid,
+		"is_muted": nowMuted,
+		"message":  msg,
+	})
 }

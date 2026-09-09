@@ -1,5 +1,6 @@
 ---
 import DashboardApp from '../components/DashboardApp';
+import MaintenanceListener from '../components/layout/MaintenanceListener';
 import '../styles/global.css';
 ---
 
@@ -7,15 +8,99 @@ import '../styles/global.css';
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Bot PTSP Kemenag Barito Utara — Dashboard Admin</title>
     <link rel="icon" href="/logo.kemenag.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <!-- Resource Hints & Priority Hints -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="//fonts.gstatic.com" />
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+
+    <!-- Open Graph Meta Tags (WhatsApp, Telegram, Facebook) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PTSP Kemenag Barito Utara" />
+    <meta property="og:title" content="Bot PTSP Kemenag Barito Utara — WhatsApp Gateway & Live Chat" />
+    <meta property="og:description" content="Sistem Pelayanan Terpadu Satu Pintu (PTSP) & WhatsApp Gateway Resmi Kantor Kementerian Agama Kabupaten Barito Utara." />
+    <meta property="og:image" content="/logo.kemenag.svg" />
+    <meta property="og:image:alt" content="Logo Kementerian Agama Republik Indonesia" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Bot PTSP Kemenag Barito Utara — WhatsApp Gateway" />
+    <meta name="twitter:description" content="Sistem Pelayanan Terpadu Satu Pintu (PTSP) & WhatsApp Gateway Kantor Kemenag Barito Utara." />
+    <meta name="twitter:image" content="/logo.kemenag.svg" />
+
+    <!-- PWA & Mobile Web App Meta -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/logo.kemenag.svg" />
+    <meta name="theme-color" content="#0d1527" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="PTSP Kemenag" />
+    <meta name="application-name" content="PTSP Kemenag Barito Utara" />
+
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <script is:inline>
+      // Daftarkan Service Worker PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .catch(function(err) { console.warn('[PWA] SW register error:', err); });
+        });
+      }
+
+      // Cloudflare Real User Monitoring (RUM) & Core Web Vitals Beacon
+      (function() {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
+        var cfScript = document.createElement('script');
+        cfScript.defer = true;
+        cfScript.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+        cfScript.setAttribute('data-cf-beacon', '{"token": "ptsp-kemenag-baritoutara"}');
+        document.head.appendChild(cfScript);
+      })();
+      if (sessionStorage.getItem("is_maintenance") === "true") {
+        window.location.replace("/maintenance");
+      }
+
+      // Verifikasi autentikasi instan sebelum tampilan dirender
+      function guardSession() {
+        fetch('/api/auth/status', { credentials: 'include', cache: 'no-store' })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (!data || !data.authenticated) {
+              sessionStorage.clear();
+              localStorage.clear();
+              window.location.replace('/login');
+            }
+          })
+          .catch(function() {
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.replace('/login');
+          });
+      }
+
+      guardSession();
+
+      // Anti-BFCache: jika halaman dipulihkan dari cache panah Back / Forward browser
+      window.addEventListener('pageshow', function(event) {
+        if (event.persisted || (window.performance && window.performance.getEntriesByType('navigation')[0]?.type === 'back_forward')) {
+          guardSession();
+        }
+      });
+    </script>
   </head>
   <body>
     <DashboardApp client:load />
+    <MaintenanceListener client:load />
   </body>
 </html>

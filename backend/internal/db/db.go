@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -32,6 +33,8 @@ func New(ctx context.Context, databaseURL, schema, outboxSchema string) (*DB, er
 	poolCfg.MinConns = 2
 	poolCfg.MaxConnLifetime = time.Hour
 	poolCfg.MaxConnIdleTime = 15 * time.Minute
+	// Supabase PgBouncer transaction mode: gunakan SimpleProtocol agar tidak bentrok prepared statement
+	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {

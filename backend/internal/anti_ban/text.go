@@ -65,3 +65,24 @@ func randomInt(min, max int) int {
 	}
 	return rand.Intn(max-min+1) + min
 }
+
+var letterRegex = regexp.MustCompile(`[a-zA-Z]`)
+
+// IsPhoneNumber mengecek apakah string merupakan representasi nomor telepon.
+func IsPhoneNumber(val string) bool {
+	val = strings.TrimSpace(val)
+	if val == "" {
+		return false
+	}
+	clean := strings.TrimSuffix(val, "@s.whatsapp.net")
+	clean = strings.TrimSuffix(clean, "@lid")
+	clean = strings.TrimSuffix(clean, "@g.us")
+	digitsOnly := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, clean)
+	hasLetters := letterRegex.MatchString(clean)
+	return !hasLetters && len(digitsOnly) >= 7 && len(digitsOnly) <= 15
+}

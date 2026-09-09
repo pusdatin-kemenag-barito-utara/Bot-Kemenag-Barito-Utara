@@ -24,7 +24,7 @@ function banner() {
   print(CYAN, '   API   : http://127.0.0.1:8080        (Go Fiber v3 + Air Live Reload)');
   print(CYAN, '   Proxy : /api dan /ws  ->  backend :8080   (hanya mode dev)');
   print(CYAN, '   DB    : DATABASE_URL (env dari Infisical)');
-  print(YELLOW, '   Log   : status tiap request (halaman FE + endpoint BE) + durasi ms');
+  print(YELLOW, '   Log   : [FE] Halaman UI  |  [BE] API Endpoint (Status & Latensi)');
   print(CYAN + BOLD, '================================================================');
   print(DIM, '   Ctrl+C  -> menghentikan backend & frontend bersamaan.');
   console.log();
@@ -67,7 +67,7 @@ async function main() {
         name: 'BE',
         command: 'air',
         cwd: 'backend',
-        prefixColor: 'yellow',
+        prefixColor: 'yellow.bold',
         env: {
           ...process.env,
           PATH: devPath,
@@ -79,7 +79,7 @@ async function main() {
         name: 'FE',
         command: 'npm run dev',
         cwd: 'frontend',
-        prefixColor: 'cyan',
+        prefixColor: 'cyan.bold',
         env: {
           ...process.env,
           PORT: process.env.FRONTEND_PORT || '3000',
@@ -89,7 +89,7 @@ async function main() {
     ],
     {
       killOthersOn: ['failure'],
-      prefix: '{time} {name}',
+      prefix: '{time} [{name}]',
       timestampFormat: 'HH:mm:ss',
     },
   );

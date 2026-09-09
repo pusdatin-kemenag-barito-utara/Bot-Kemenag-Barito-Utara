@@ -28,10 +28,31 @@ export function createActivityChart(canvas: HTMLCanvasElement, points: ChartPoin
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#9ca3af' } } },
+      resizeDelay: 50,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#9ca3af',
+            boxWidth: 10,
+            font: { size: 11 },
+          },
+        },
+      },
       scales: {
-        x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        x: {
+          ticks: {
+            color: '#9ca3af',
+            font: { size: 10 },
+            autoSkip: true,
+            maxTicksLimit: 5,
+            maxRotation: 0,
+          },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+        },
+        y: {
+          ticks: { color: '#9ca3af', font: { size: 10 } },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+        },
       },
     },
   });

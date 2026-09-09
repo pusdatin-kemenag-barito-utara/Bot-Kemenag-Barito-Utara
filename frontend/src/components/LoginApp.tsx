@@ -22,40 +22,84 @@ export default function LoginApp() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      let siteKey = '';
-      try {
-        const res = await api.turnstileKey();
-        if (res.siteKey) siteKey = res.siteKey;
-      } catch {
-        /* fetch error */
+    let checkTimer: ReturnType<typeof setInterval> | null = null;
+
+    api.authStatus().then((s) => {
+      if (!cancelled && s.authenticated) {
+        window.location.replace('/');
       }
-      if (!siteKey) return;
-      const enforce = () => {
-        if (cancelled || !window.turnstile || !tcRef.current) return;
-        widgetId.current = window.turnstile.render(tcRef.current, {
-          sitekey: siteKey,
-          theme: 'dark',
-          size: 'flexible',
-          callback: (token: string) => {
-            turnstileToken.current = token;
-          },
-        });
+    }).catch(() => undefined);
+
+    (async () => {
+      let siteKey =
+        import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ||
+        import.meta.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
+        '';
+
+      if (!siteKey) {
+        try {
+          const res = await api.turnstileKey();
+          if (res.siteKey) siteKey = res.siteKey;
+        } catch {
+          /* fetch error */
+        }
+      }
+
+      if (!siteKey || cancelled) return;
+
+      const renderTurnstile = () => {
+        if (cancelled || !tcRef.current || widgetId.current !== undefined) return;
+        if (window.turnstile && typeof window.turnstile.render === 'function') {
+          if (checkTimer) {
+            clearInterval(checkTimer);
+            checkTimer = null;
+          }
+          try {
+            widgetId.current = window.turnstile.render(tcRef.current, {
+              sitekey: siteKey,
+              theme: 'dark',
+              size: 'flexible',
+              callback: (token: string) => {
+                turnstileToken.current = token;
+              },
+              'expired-callback': () => {
+                turnstileToken.current = '';
+              },
+              'error-callback': () => {
+                turnstileToken.current = '';
+              },
+            });
+          } catch (err) {
+            console.error('Turnstile render error:', err);
+          }
+        }
       };
-      const check = setInterval(enforce, 100);
-      setTimeout(() => clearInterval(check), 10000);
-      return () => clearInterval(check);
+
+      renderTurnstile();
+      if (widgetId.current === undefined) {
+        checkTimer = setInterval(renderTurnstile, 150);
+      }
     })();
+
     return () => {
       cancelled = true;
+      if (checkTimer) clearInterval(checkTimer);
     };
   }, []);
 
   async function submitLogin() {
+    if (!username.trim()) {
+      setError('Username wajib diisi.');
+      return;
+    }
+    if (!password) {
+      setError('Password wajib diisi.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
-      const res = await api.login(username.trim(), password.trim(), turnstileToken.current);
+      const res = await api.login(username.trim(), password, turnstileToken.current);
       if (res.success) {
         window.location.href = res.redirectTo || '/';
         return;
@@ -86,7 +130,14 @@ export default function LoginApp() {
         <div className="brand-header">
           <div className="brand-logo-wrapper">
             <div className="brand-logo-glow" />
-            <img className="brand-logo-img" src="/logo.kemenag.svg" alt="Kemenag Logo" />
+            <img
+              className="brand-logo-img"
+              src="/logo.kemenag.svg"
+              alt="Kemenag Logo"
+              width="48"
+              height="48"
+              decoding="async"
+            />
           </div>
           <h1 className="brand-title">Bot PTSP Kemenag</h1>
           <p className="brand-subtitle">Kantor Kementerian Agama Kab. Barito Utara</p>
@@ -155,7 +206,12 @@ export default function LoginApp() {
             <div ref={tcRef} />
           </div>
 
-          <button type="submit" className="btn-submit" disabled={loading}>
+          <button
+            type="button"
+            onClick={() => void submitLogin()}
+            className="btn-submit"
+            disabled={loading}
+          >
             {loading ? (
               <>
                 <i className="fa-solid fa-spinner fa-spin" /> <span>Memverifikasi...</span>

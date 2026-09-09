@@ -36,7 +36,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 # alpine + ca-certificates karena whatsmeow melakukan TLS ke WhatsApp.
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tzdata && \
+RUN apk add --no-cache ca-certificates tzdata curl bash && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.alpine.sh' | bash && \
+    apk add --no-cache infisical && \
     adduser -D -u 10001 appuser
 
 WORKDIR /app
@@ -45,8 +47,11 @@ COPY --from=builder /out/ptsp-wa-bot /usr/local/bin/ptsp-wa-bot
 # Frontend build dari stage 1 (outDir Astro diresolusi ke /backend/web/public).
 COPY --from=frontend /backend/web/public ./web/public
 
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 USER appuser
 
 EXPOSE 8080
 
-ENTRYPOINT ["ptsp-wa-bot"]
+ENTRYPOINT ["docker-entrypoint.sh"]

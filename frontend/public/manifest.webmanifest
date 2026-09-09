@@ -1,0 +1,36 @@
+{
+  "name": "PTSP Kemenag Barito Utara — WhatsApp Gateway",
+  "short_name": "PTSP Kemenag",
+  "description": "Dashboard Pelayanan Terpadu Satu Pintu & WhatsApp Gateway Kantor Kementerian Agama Kabupaten Barito Utara",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#0d1527",
+  "theme_color": "#0d1527",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/logo.kemenag.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["government", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Live Chat PTSP",
+      "short_name": "Live Chat",
+      "description": "Buka obrolan langsung pemohon",
+      "url": "/?tab=chats",
+      "icons": [{ "src": "/logo.kemenag.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Daftar Pemohon",
+      "short_name": "Kontak",
+      "description": "Lihat data kontak pemohon PTSP",
+      "url": "/?tab=contacts",
+      "icons": [{ "src": "/logo.kemenag.svg", "sizes": "192x192" }]
+    }
+  ]
+}

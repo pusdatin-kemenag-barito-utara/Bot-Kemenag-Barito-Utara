@@ -56,10 +56,15 @@ type Manager struct {
 // NewManager membuat Manager dan menghubungkan ke store PostgreSQL yang sama.
 // DSN yang diterima adalah URL koneksi psql (dari DATABASE_URL / DIRECT_URL).
 func NewManager(ctx context.Context, dsn string, logger waLog.Logger) (*Manager, error) {
-	// Pastikan identitas perangkat dikenali sebagai Google Chrome resmi di Windows
-	// agar server WhatsApp tidak menolak penautan perangkat ("Tidak dapat menautkan perangkat")
+	// 1. Ambil versi WhatsApp Web terbaru langsung dari server Meta secara dinamis
+	if latestVer, err := whatsmeow.GetLatestVersion(ctx, nil); err == nil && latestVer != nil {
+		store.SetWAVersion(*latestVer)
+		logger.Infof("Menggunakan versi WhatsApp Web terbaru dari Meta: %s", latestVer)
+	}
+
+	// 2. Pastikan identitas perangkat dikenali sebagai Google Chrome modern di Windows
 	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_CHROME.Enum()
-	store.SetOSInfo("Windows", [3]uint32{10, 0, 19045})
+	store.SetOSInfo("Chrome (Windows)", [3]uint32{133, 0, 6943})
 
 	storeContainer, err := sqlstore.New(ctx, "postgres", dsn, logger)
 	if err != nil {

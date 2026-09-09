@@ -24,6 +24,7 @@ type Store struct {
 	Outbox      *OutboxStore
 	WebhookLogs *WebhookLogStore
 	AutoReplies *AutoReplyStore
+	Services    *ServiceStore
 }
 
 // New membuat Store lengkap beserta semua sub-store.
@@ -38,6 +39,7 @@ func New(pool *pgxpool.Pool, schema, outboxSchema string) *Store {
 	s.Outbox = &OutboxStore{store: s}
 	s.WebhookLogs = &WebhookLogStore{store: s}
 	s.AutoReplies = &AutoReplyStore{store: s}
+	s.Services = &ServiceStore{store: s}
 	return s
 }
 

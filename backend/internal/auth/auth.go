@@ -190,13 +190,22 @@ func (m *Manager) Login(c fiber.Ctx) error {
 
 	m.recordRateFail(c.IP())
 	log.Printf("[Auth] Percobaan login gagal untuk username: %q", username)
+	if !usernameMatch {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false, "message": "Akun tidak ditemukan. Username yang Anda masukkan salah.",
+		})
+	}
 	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-		"success": false, "message": "Username atau password yang Anda masukkan salah.",
+		"success": false, "message": "Password yang Anda masukkan salah.",
 	})
 }
 
 // Logout memproses POST /api/auth/logout.
 func (m *Manager) Logout(c fiber.Ctx) error {
+	c.Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	c.Set("Pragma", "no-cache")
+	c.Set("Expires", "0")
+
 	s := m.sessionOf(c)
 	if s != nil {
 		if err := s.Destroy(); err != nil {
@@ -206,9 +215,17 @@ func (m *Manager) Logout(c fiber.Ctx) error {
 			})
 		}
 	}
-	sessCookie := &fiber.Cookie{Name: "ptsp.sid", Value: "", Expires: time.Unix(0, 0), Path: "/"}
+	sessCookie := &fiber.Cookie{
+		Name:     "ptsp.sid",
+		Value:    "",
+		Expires:  time.Now().Add(-24 * time.Hour),
+		MaxAge:   -1,
+		Path:     "/",
+		HTTPOnly: true,
+		SameSite: "Lax",
+	}
 	c.Cookie(sessCookie)
-	log.Printf("[Auth] Logout berhasil.")
+	log.Printf("[Auth] Logout berhasil, sesi admin ditutup.")
 	return c.JSON(fiber.Map{
 		"success": true, "message": "Berhasil logout.", "redirectTo": "/login",
 	})
@@ -216,6 +233,10 @@ func (m *Manager) Logout(c fiber.Ctx) error {
 
 // Status memproses GET /api/auth/status.
 func (m *Manager) Status(c fiber.Ctx) error {
+	c.Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	c.Set("Pragma", "no-cache")
+	c.Set("Expires", "0")
+
 	s := m.sessionOf(c)
 	authd := false
 	username := ""
@@ -229,14 +250,15 @@ func (m *Manager) Status(c fiber.Ctx) error {
 	}
 	if authd {
 		return c.JSON(fiber.Map{
-			"success": true,
+			"success":       true,
 			"authenticated": true,
-			"username": username,
-			"loginTime": loginTime,
+			"username":      username,
+			"loginTime":     loginTime,
 		})
 	}
-	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-		"success": false, "authenticated": false,
+	return c.JSON(fiber.Map{
+		"success":       true,
+		"authenticated": false,
 	})
 }
 
@@ -264,7 +286,11 @@ func (m *Manager) RequireAuth(c fiber.Ctx) error {
 	if authd {
 		return c.Next()
 	}
-	if strings.HasPrefix(c.Path(), "/api/") {
+	c.Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	c.Set("Pragma", "no-cache")
+	c.Set("Expires", "0")
+
+	if strings.HasPrefix(c.Path(), "/api/") || c.Path() == "/ws" || strings.EqualFold(c.Get("Upgrade"), "websocket") {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"success": false, "message": "Sesi tidak valid. Silakan login kembali.",
 			"redirectTo": "/login",
@@ -327,6 +353,11 @@ func (m *Manager) validCSRF(cookie, header string) bool {
 // --- Rate limiting (percobaan gagal) ---
 
 func (m *Manager) checkRateLimit(ip string) bool {
+	// Bypass rate limit saat development lokal / localhost agar tidak terkunci saat testing.
+	if ip == "127.0.0.1" || ip == "::1" || ip == "localhost" {
+		return true
+	}
+
 	now := time.Now()
 	m.rateMu.Lock()
 	defer m.rateMu.Unlock()

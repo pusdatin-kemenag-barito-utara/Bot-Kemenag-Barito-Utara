@@ -47,6 +47,18 @@ func New(store *dbstore.Store, cfg *config.Config, a *auth.Manager, waClient WA,
 
 // Route menghubungkan semua endpoint API, urutannya meniru apiRoutes.js.
 func (h *Handler) Route(app *fiber.App) {
+	// Public: Health check untuk pemantauan Pusdatin dan uptime monitor
+	healthHandler := func(c fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":       "ok",
+			"service":      "ptsp-wa-bot",
+			"wa_connected": h.WA != nil && h.WA.IsConnected(),
+			"timestamp":    time.Now().UTC().Format(time.RFC3339),
+		})
+	}
+	app.Get("/health", healthHandler)
+	app.Get("/api/health", healthHandler)
+
 	// Public: login/logout/status + webhook test via API key di send.
 	app.Post("/api/auth/login", h.Auth.Login)
 	app.Post("/api/auth/logout", h.Auth.Logout)
@@ -68,6 +80,8 @@ func (h *Handler) Route(app *fiber.App) {
 	sec.Get("/contacts/top", h.GetTopContacts)
 	sec.Get("/chats", h.GetChats)
 	sec.Get("/chats/:jid/messages", h.GetChatMessages)
+	sec.Get("/chats/:jid/bot-status", h.GetBotChatStatus)
+	sec.Post("/chats/:jid/bot-toggle", h.ToggleBotChat)
 	sec.Delete("/chats/:jid", h.DeleteChat)
 	sec.Delete("/chats", h.DeleteAllChats)
 

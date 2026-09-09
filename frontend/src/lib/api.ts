@@ -71,29 +71,55 @@ export interface ChartPoint {
 }
 
 async function parse<T>(res: Response): Promise<T> {
-  const data = (await res.json()) as T;
-  if (!res.ok) {
-    throw new Error((data as { message?: string }).message || `HTTP ${res.status}`);
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { success: false, message: text || `HTTP ${res.status}` };
   }
-  return data;
+
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
+    }
+    const defaultMsg = res.status === 431 ? 'Ukuran header terlalu besar. Silakan refresh halaman.' : `HTTP ${res.status}`;
+    throw new Error(data && typeof data === 'object' && data.message ? data.message : defaultMsg);
+  }
+  return data as T;
 }
 
 async function get<T>(url: string): Promise<T> {
-  return parse<T>(await fetch(url));
+  return parse<T>(
+    await fetch(url, {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    }),
+  );
 }
 
 async function post<T = { success: boolean; message?: string }>(url: string, body?: unknown): Promise<T> {
   return parse<T>(
     await fetch(url, {
       method: 'POST',
-      headers: body != null ? { 'Content-Type': 'application/json' } : undefined,
+      headers: {
+        Accept: 'application/json',
+        ...(body != null ? { 'Content-Type': 'application/json' } : {}),
+      },
       body: body != null ? JSON.stringify(body) : undefined,
+      credentials: 'same-origin',
     }),
   );
 }
 
 async function del<T = { success: boolean; message?: string }>(url: string): Promise<T> {
-  return parse<T>(await fetch(url, { method: 'DELETE' }));
+  return parse<T>(
+    await fetch(url, {
+      method: 'DELETE',
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    }),
+  );
 }
 
 export const api = {
@@ -122,6 +148,14 @@ export const api = {
   chats: () => get<{ success: boolean; data: ChatSummary[] }>('/api/chats'),
   chatMessages: (jid: string) =>
     get<{ success: boolean; data: Message[] }>(`/api/chats/${encodeURIComponent(jid)}/messages`),
+  getBotChatStatus: (jid: string) =>
+    get<{ success: boolean; jid: string; is_muted: boolean; muted_until: number; reason: string; is_opt_out: boolean }>(
+      `/api/chats/${encodeURIComponent(jid)}/bot-status`,
+    ),
+  toggleBotChat: (jid: string) =>
+    post<{ success: boolean; jid: string; is_muted: boolean; message: string }>(
+      `/api/chats/${encodeURIComponent(jid)}/bot-toggle`,
+    ),
   deleteChat: (jid: string) =>
     del(`/api/chats/${encodeURIComponent(jid)}`),
   deleteAllChats: () => del('/api/chats'),

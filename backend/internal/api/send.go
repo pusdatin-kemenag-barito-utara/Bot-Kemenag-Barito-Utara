@@ -67,6 +67,7 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 	}
 
 	clean := strings.TrimSpace(body.To)
+	clean = strings.ReplaceAll(clean, "%40", "@")
 	if strings.HasPrefix(clean, "0") {
 		clean = "62" + clean[1:]
 	}
@@ -81,9 +82,12 @@ func (h *Handler) SendMessage(c fiber.Ctx) error {
 	if err != nil {
 		return errStatus(c, fiber.StatusBadRequest, "Nomor WhatsApp tidak valid")
 	}
-	if jid.Server != types.DefaultUserServer {
-		return errStatus(c, fiber.StatusBadRequest, "Nomor WhatsApp tidak valid (bukan nomor pengguna)")
+	if jid.Server != types.DefaultUserServer && jid.Server != types.HiddenUserServer && jid.Server != types.GroupServer {
+		return errStatus(c, fiber.StatusBadRequest, "Nomor WhatsApp tidak valid (server target tidak didukung)")
 	}
+
+	// Otomatis jeda bot selama 30 menit karena admin sedang mengambil alih percakapan (human handover)
+	anti_ban.GetBotControl().Mute(clean, 30*time.Minute, "admin_takeover")
 
 	// Kirim lewat goroutine biar tidak memblokir request (seperti Node).
 	go func() {

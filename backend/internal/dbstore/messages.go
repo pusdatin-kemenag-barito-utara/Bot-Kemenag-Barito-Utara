@@ -52,16 +52,21 @@ type ListFilter struct {
 // List mengembalikan pesan dengan filter, diurutkan timestamp DESC.
 func (s *MessageStore) List(ctx context.Context, f ListFilter) ([]MessageWithContact, error) {
 	query := `SELECT m.id, m.remote_jid, m.is_from_me, m.message_type, m.content, m.timestamp, m.created_at,
-		COALESCE(c.name, split_part(m.remote_jid, '@', 1)) as contact_name
+		CASE 
+			WHEN c.name IS NOT NULL AND c.name != '' AND c.name NOT ILIKE '%klien%' AND c.name != 'Unknown'
+			THEN c.name 
+			ELSE split_part(m.remote_jid, '@', 1) 
+		END as contact_name
 		FROM ` + s.store.q("wa_message_logs") + ` m
 		LEFT JOIN ` + s.store.q("wa_contacts") + ` c ON c.remote_jid = m.remote_jid
 		WHERE 1=1`
 	args := []any{}
 	argi := 1
 
-	if f.Direction == "in" {
+	switch f.Direction {
+	case "in":
 		query += ` AND m.is_from_me = false`
-	} else if f.Direction == "out" {
+	case "out":
 		query += ` AND m.is_from_me = true`
 	}
 	if f.StartDate != nil {
@@ -125,7 +130,7 @@ func (s *MessageStore) ChartLast7Days(ctx context.Context) ([]ChartPoint, error)
 			SELECT generate_series(current_date - interval '6 days', current_date, '1 day'::interval)::date as date
 		)
 		SELECT
-			d.date,
+			to_char(d.date, 'YYYY-MM-DD') as raw_date,
 			to_char(d.date, 'DD Mon') as date_label,
 			COUNT(m.id) FILTER (WHERE m.is_from_me = false) as inbound,
 			COUNT(m.id) FILTER (WHERE m.is_from_me = true) as outbound
@@ -158,7 +163,11 @@ func (s *MessageStore) ChartLast7Days(ctx context.Context) ([]ChartPoint, error)
 func (s *MessageStore) Search(ctx context.Context, q string) ([]MessageWithContact, error) {
 	rows, err := s.store.Query(ctx,
 		`SELECT m.id, m.remote_jid, m.is_from_me, m.message_type, m.content, m.timestamp, m.created_at,
-			COALESCE(c.name, split_part(m.remote_jid, '@', 1)) as contact_name
+			CASE 
+				WHEN c.name IS NOT NULL AND c.name != '' AND c.name NOT ILIKE '%klien%' AND c.name != 'Unknown'
+				THEN c.name 
+				ELSE split_part(m.remote_jid, '@', 1) 
+			END as contact_name
 		FROM `+s.store.q("wa_message_logs")+` m
 		LEFT JOIN `+s.store.q("wa_contacts")+` c ON c.remote_jid = m.remote_jid
 		WHERE m.content ILIKE $1
@@ -195,7 +204,11 @@ type ExportRow struct {
 func (s *MessageStore) Export(ctx context.Context) ([]ExportRow, error) {
 	rows, err := s.store.Query(ctx,
 		`SELECT
-			COALESCE(c.name, split_part(m.remote_jid, '@', 1)) as contact,
+			CASE 
+				WHEN c.name IS NOT NULL AND c.name != '' AND c.name NOT ILIKE '%klien%' AND c.name != 'Unknown'
+				THEN c.name 
+				ELSE split_part(m.remote_jid, '@', 1) 
+			END as contact,
 			m.remote_jid,
 			CASE WHEN m.is_from_me THEN 'Keluar' ELSE 'Masuk' END as arah,
 			m.message_type as tipe,
@@ -239,7 +252,11 @@ func (s *MessageStore) ListChats(ctx context.Context) ([]Chat, error) {
 		)
 		SELECT
 			dj.remote_jid,
-			COALESCE(c.name, split_part(dj.remote_jid, '@', 1)) as name,
+			CASE 
+				WHEN c.name IS NOT NULL AND c.name != '' AND c.name NOT ILIKE '%klien%' AND c.name != 'Unknown'
+				THEN c.name 
+				ELSE split_part(dj.remote_jid, '@', 1) 
+			END as name,
 			m.content as last_message,
 			m.timestamp as last_time,
 			m.is_from_me as last_is_from_me
@@ -268,23 +285,19 @@ func (s *MessageStore) ListChats(ctx context.Context) ([]Chat, error) {
 	return out, rows.Err()
 }
 
-// ListByJID mengembalikan pesan unik untuk satu chat, urut ascending,
-// dengan zero-width chars pada konten dibersihkan untuk dedup.
+// ListByJID mengembalikan seluruh pesan untuk satu chat, urut kronologis (ascending).
 func (s *MessageStore) ListByJID(ctx context.Context, jid string) ([]Message, error) {
 	rows, err := s.store.Query(ctx,
-		`SELECT * FROM (
-			SELECT DISTINCT ON (is_from_me, regexp_replace(content, '[\u200B-\u200D\uFEFF]', '', 'g')) *
-			FROM `+s.store.q("wa_message_logs")+`
-			WHERE remote_jid = $1
-			ORDER BY is_from_me, regexp_replace(content, '[\u200B-\u200D\uFEFF]', '', 'g'), timestamp ASC
-		) sub
-		ORDER BY timestamp ASC`, jid)
+		`SELECT id, remote_jid, is_from_me, message_type, content, timestamp, created_at
+		 FROM `+s.store.q("wa_message_logs")+`
+		 WHERE remote_jid = $1
+		 ORDER BY timestamp ASC, id ASC`, jid)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var out []Message
+	out := []Message{}
 	for rows.Next() {
 		var m Message
 		if err := rows.Scan(&m.ID, &m.RemoteJID, &m.IsFromMe, &m.MessageType, &m.Content,
