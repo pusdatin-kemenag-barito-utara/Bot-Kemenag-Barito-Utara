@@ -4,6 +4,7 @@ package wa
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -12,6 +13,8 @@ import (
 	_ "github.com/lib/pq"
 
 	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -34,11 +37,14 @@ const (
 
 // Manager mengelola lifecycle klien whatsmeow dan menyebarkan event.
 type Manager struct {
-	Client *whatsmeow.Client
-	mu     sync.RWMutex
+	Client    *whatsmeow.Client
+	container *sqlstore.Container
+	logger    waLog.Logger
+	mu        sync.RWMutex
 
-	state ConnectionState
-	qr    []string
+	state    ConnectionState
+	qr       []string
+	qrCancel context.CancelFunc
 
 	// HandlerHook dipanggil untuk setiap event whatsmeow (agar bisa diteruskan
 	// ke message handler).
@@ -48,8 +54,13 @@ type Manager struct {
 }
 
 // NewManager membuat Manager dan menghubungkan ke store PostgreSQL yang sama.
-// DSN yang diterima adalah URL koneksi psql (dari DATABASE_URL).
+// DSN yang diterima adalah URL koneksi psql (dari DATABASE_URL / DIRECT_URL).
 func NewManager(ctx context.Context, dsn string, logger waLog.Logger) (*Manager, error) {
+	// Pastikan identitas perangkat dikenali sebagai Google Chrome resmi di Windows
+	// agar server WhatsApp tidak menolak penautan perangkat ("Tidak dapat menautkan perangkat")
+	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_CHROME.Enum()
+	store.SetOSInfo("Windows", [3]uint32{10, 0, 19045})
+
 	storeContainer, err := sqlstore.New(ctx, "postgres", dsn, logger)
 	if err != nil {
 		return nil, fmt.Errorf("init whatsmeow store: %w", err)
@@ -64,8 +75,10 @@ func NewManager(ctx context.Context, dsn string, logger waLog.Logger) (*Manager,
 	client.EnableAutoReconnect = true
 
 	m := &Manager{
-		Client: client,
-		state:  StateUnavailable,
+		Client:    client,
+		container: storeContainer,
+		logger:    logger,
+		state:     StateUnavailable,
 	}
 	client.AddEventHandler(m.handleEvent)
 	return m, nil
@@ -80,8 +93,23 @@ func (m *Manager) handleEvent(evt any) {
 		m.mu.Unlock()
 		m.notifyState(StateWaitingForQR, "")
 
+	case *events.PairSuccess:
+		m.mu.Lock()
+		m.qr = nil
+		m.state = StateConnecting
+		m.mu.Unlock()
+		m.notifyState(StateConnecting, "Berhasil menautkan perangkat, menyambungkan...")
+
+	case *events.PairError:
+		m.mu.Lock()
+		m.qr = nil
+		m.state = StateDisconnected
+		m.mu.Unlock()
+		m.notifyState(StateDisconnected, fmt.Sprintf("Gagal menautkan: %v", v.Error))
+
 	case *events.Connected:
 		m.mu.Lock()
+		m.qr = nil
 		m.state = StateConnected
 		m.mu.Unlock()
 		m.notifyState(StateConnected, "")
@@ -94,6 +122,7 @@ func (m *Manager) handleEvent(evt any) {
 
 	case *events.LoggedOut:
 		m.mu.Lock()
+		m.qr = nil
 		m.state = StateLoggedOut
 		m.mu.Unlock()
 		m.notifyState(StateLoggedOut, "")
@@ -110,12 +139,78 @@ func (m *Manager) notifyState(state ConnectionState, detail string) {
 	}
 }
 
-// Connect memulai koneksi. Error dikembalikan bila Whatsapp menolak.
+// Connect memulai koneksi atau menyiapkan QR code baru jika belum tertaut.
 func (m *Manager) Connect() error {
+	m.mu.Lock()
+	if m.qrCancel != nil {
+		m.qrCancel()
+		m.qrCancel = nil
+	}
+	m.mu.Unlock()
+
+	if m.Client.IsConnected() {
+		if m.Client.IsLoggedIn() {
+			m.mu.Lock()
+			m.state = StateConnected
+			m.mu.Unlock()
+			m.notifyState(StateConnected, "")
+			return nil
+		}
+		m.Client.Disconnect()
+	}
+
 	m.mu.Lock()
 	m.state = StateConnecting
 	m.mu.Unlock()
 	m.notifyState(StateConnecting, "")
+
+	if m.Client.Store.ID == nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		m.mu.Lock()
+		m.qrCancel = cancel
+		m.mu.Unlock()
+
+		qrChan, err := m.Client.GetQRChannel(ctx)
+		if err != nil && !errors.Is(err, whatsmeow.ErrQRStoreContainsID) {
+			cancel()
+			return fmt.Errorf("get qr channel: %w", err)
+		}
+
+		if qrChan != nil {
+			go func() {
+				defer cancel()
+				for item := range qrChan {
+					switch item.Event {
+					case "code":
+						m.mu.Lock()
+						m.qr = []string{item.Code}
+						m.state = StateWaitingForQR
+						m.mu.Unlock()
+						m.notifyState(StateWaitingForQR, "")
+						if m.OnEvent != nil {
+							m.OnEvent(&events.QR{Codes: []string{item.Code}})
+						}
+					case "success":
+						m.mu.Lock()
+						m.qr = nil
+						m.state = StateConnected
+						m.mu.Unlock()
+						m.notifyState(StateConnected, "Berhasil ditautkan")
+					case "timeout":
+						m.mu.Lock()
+						m.qr = nil
+						m.state = StateDisconnected
+						m.mu.Unlock()
+						m.notifyState(StateDisconnected, "QR code kadaluarsa")
+					default:
+						if item.Error != nil {
+							m.notifyState(m.State(), item.Error.Error())
+						}
+					}
+				}
+			}()
+		}
+	}
 
 	return m.Client.Connect()
 }
@@ -141,13 +236,31 @@ func (m *Manager) QR() []string {
 
 // Logout menghapus sesi perangkat sehingga butuh QR ulang.
 func (m *Manager) Logout(ctx context.Context) error {
-	if err := m.Client.Logout(ctx); err != nil {
-		return err
-	}
-	if err := m.Client.Store.Delete(ctx); err != nil {
-		return err
-	}
 	m.mu.Lock()
+	if m.qrCancel != nil {
+		m.qrCancel()
+		m.qrCancel = nil
+	}
+	m.mu.Unlock()
+
+	if m.Client.IsConnected() {
+		_ = m.Client.Logout(ctx)
+	}
+	_ = m.Client.Store.Delete(ctx)
+	m.Client.Disconnect()
+
+	// Buat device store baru agar sesi bersih tanpa sampah sesi usang
+	if m.container != nil {
+		newDevice, err := m.container.GetFirstDevice(ctx)
+		if err == nil {
+			m.Client = whatsmeow.NewClient(newDevice, m.logger)
+			m.Client.EnableAutoReconnect = true
+			m.Client.AddEventHandler(m.handleEvent)
+		}
+	}
+
+	m.mu.Lock()
+	m.qr = nil
 	m.state = StateLoggedOut
 	m.mu.Unlock()
 	m.notifyState(StateLoggedOut, "")

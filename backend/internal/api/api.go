@@ -18,6 +18,7 @@ import (
 // WA adalah antarmuka WhatsApp yang dipakai API. Dipenuhi *wa.Manager.
 type WA interface {
 	IsConnected() bool
+	Connect() error
 	SendText(ctx context.Context, jid types.JID, text string) (string, error)
 	Logout(ctx context.Context) error
 }
@@ -46,9 +47,6 @@ func New(store *dbstore.Store, cfg *config.Config, a *auth.Manager, waClient WA,
 
 // Route menghubungkan semua endpoint API, urutannya meniru apiRoutes.js.
 func (h *Handler) Route(app *fiber.App) {
-	// Semua rute API lewat session middleware agar req.session tersedia.
-	app.Use("/api", h.Auth.Middleware())
-
 	// Public: login/logout/status + webhook test via API key di send.
 	app.Post("/api/auth/login", h.Auth.Login)
 	app.Post("/api/auth/logout", h.Auth.Logout)
@@ -60,6 +58,7 @@ func (h *Handler) Route(app *fiber.App) {
 
 	// Protected routes (Requires Auth).
 	sec := app.Group("/api", h.Auth.RequireAuth)
+	sec.Post("/connect", h.ConnectWa)
 	sec.Get("/messages", h.GetMessages)
 	sec.Get("/messages/chart", h.GetMessagesChart)
 	sec.Get("/messages/search", h.SearchMessages)

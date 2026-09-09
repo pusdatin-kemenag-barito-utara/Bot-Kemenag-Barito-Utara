@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -153,7 +154,15 @@ func (m *Manager) Login(c fiber.Ctx) error {
 		})
 	}
 
-	usernameMatch := strings.EqualFold(username, m.AdminUsername)
+	adminUser := m.AdminUsername
+	if u := strings.TrimSpace(os.Getenv("ADMIN_USERNAME")); u != "" {
+		adminUser = u
+	}
+	if adminUser == "" {
+		adminUser = "admin"
+	}
+
+	usernameMatch := strings.EqualFold(username, adminUser)
 	passwordMatch := m.verifyPassword(password)
 
 	if usernameMatch && passwordMatch {
@@ -164,7 +173,7 @@ func (m *Manager) Login(c fiber.Ctx) error {
 			})
 		}
 		s.Set("authenticated", true)
-		s.Set("username", m.AdminUsername)
+		s.Set("username", username)
 		s.Set("loginTime", time.Now().UTC().Format(time.RFC3339))
 		if err := s.Save(); err != nil {
 			log.Printf("[Auth] Gagal menyimpan sesi ke store: %v", err)
@@ -235,7 +244,10 @@ func (m *Manager) Status(c fiber.Ctx) error {
 func (m *Manager) TurnstileKey(c fiber.Ctx) error {
 	siteKey := m.TurnstileSiteKey
 	if siteKey == "" {
-		siteKey = "0x4AAAAAADR1O_LSp1lgc3km"
+		siteKey = os.Getenv("TURNSTILE_SITE_KEY")
+	}
+	if siteKey == "" {
+		siteKey = os.Getenv("NEXT_PUBLIC_TURNSTILE_SITE_KEY")
 	}
 	return c.JSON(fiber.Map{"success": true, "siteKey": siteKey})
 }
@@ -349,12 +361,15 @@ func (m *Manager) clearRateLimit(ip string) {
 // --- Password & Turnstile ---
 
 func (m *Manager) validAdmin() bool {
-	return m.AdminPasswordHash != "" || m.AdminPassword != ""
+	return m.AdminPasswordHash != "" || m.AdminPassword != "" || os.Getenv("ADMIN_PASSWORD_HASH") != "" || os.Getenv("ADMIN_PASSWORD") != ""
 }
 
 func (m *Manager) verifyPassword(password string) bool {
-	if m.AdminPasswordHash != "" {
-		hash := strings.TrimSpace(m.AdminPasswordHash)
+	hash := strings.TrimSpace(m.AdminPasswordHash)
+	if h := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD_HASH")); h != "" {
+		hash = h
+	}
+	if hash != "" {
 		// Base64-decode bila diset dalam bentuk encoded (hindari masalah $).
 		if !strings.HasPrefix(hash, "$2") {
 			if decoded, err := base64.StdEncoding.DecodeString(hash); err == nil && strings.HasPrefix(string(decoded), "$2") {
@@ -370,8 +385,12 @@ func (m *Manager) verifyPassword(password string) bool {
 			return password == hash
 		}
 	}
-	if m.AdminPassword != "" {
-		return password == m.AdminPassword
+	adminPwd := m.AdminPassword
+	if p := os.Getenv("ADMIN_PASSWORD"); p != "" {
+		adminPwd = p
+	}
+	if adminPwd != "" {
+		return password == adminPwd
 	}
 	return false
 }

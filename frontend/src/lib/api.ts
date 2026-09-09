@@ -136,5 +136,6 @@ export const api = {
   testWebhook: () => post<{ success: boolean; message: string }>('/api/webhook/test'),
 
   send: (to: string, text: string) => post<{ success: boolean; message?: string }>('/api/send', { to, text }),
+  connectWa: () => post<{ success: boolean; message?: string }>('/api/connect'),
   logoutWa: () => post<{ success: boolean; message?: string }>('/api/logout'),
 };

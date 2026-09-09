@@ -54,7 +54,11 @@ func main() {
 
 	// --- WhatsApp client ---
 	logger := waLog.Stdout("WA", "INFO", false)
-	manager, err := wa.NewManager(ctx, cfg.DatabaseURL, logger)
+	waDSN := cfg.DirectURL
+	if waDSN == "" {
+		waDSN = cfg.DatabaseURL
+	}
+	manager, err := wa.NewManager(ctx, waDSN, logger)
 	if err != nil {
 		log.Fatalf("[WA] %v", err)
 	}

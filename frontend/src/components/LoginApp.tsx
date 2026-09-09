@@ -23,18 +23,20 @@ export default function LoginApp() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let siteKey = '0x4AAAAAADR1O_LSp1lgc3km';
+      let siteKey = '';
       try {
         const res = await api.turnstileKey();
         if (res.siteKey) siteKey = res.siteKey;
       } catch {
-        /* pakai key default */
+        /* fetch error */
       }
+      if (!siteKey) return;
       const enforce = () => {
         if (cancelled || !window.turnstile || !tcRef.current) return;
         widgetId.current = window.turnstile.render(tcRef.current, {
           sitekey: siteKey,
           theme: 'dark',
+          size: 'flexible',
           callback: (token: string) => {
             turnstileToken.current = token;
           },
@@ -74,17 +76,22 @@ export default function LoginApp() {
   }
 
   return (
-    <>
+    <div className="login-viewport">
       <div className="bg-grid" />
-      <div className="bg-glow" />
-      <div className="bg-glow-secondary" />
+      <div className="bg-radial-vignette" />
+      <div className="bg-glow bg-glow-primary" />
+      <div className="bg-glow bg-glow-secondary" />
 
       <div className="login-card">
         <div className="brand-header">
-          <img className="brand-logo-img" src="/logo.kemenag.svg" alt="Kemenag Logo" />
+          <div className="brand-logo-wrapper">
+            <div className="brand-logo-glow" />
+            <img className="brand-logo-img" src="/logo.kemenag.svg" alt="Kemenag Logo" />
+          </div>
           <h1 className="brand-title">Bot PTSP Kemenag</h1>
-          <p className="brand-subtitle">Kabupaten Barito Utara</p>
+          <p className="brand-subtitle">Kantor Kementerian Agama Kab. Barito Utara</p>
           <div className="brand-badge-tag">
+            <span className="pulse-dot" />
             <i className="fa-solid fa-shield-halved" /> Panel Admin Management
           </div>
         </div>
@@ -135,22 +142,23 @@ export default function LoginApp() {
                 type="button"
                 className="toggle-password-btn"
                 onClick={() => setShowPwd((v) => !v)}
-                title="Tampilkan/Sembunyikan Password"
+                title={showPwd ? 'Sembunyikan password' : 'Lihat password'}
+                aria-label={showPwd ? 'Sembunyikan password' : 'Lihat password'}
                 tabIndex={-1}
               >
-                <i className={`fa-solid ${showPwd ? 'fa-eye' : 'fa-eye-slash'}`} />
+                <i className={`fa-solid ${showPwd ? 'fa-eye-slash' : 'fa-eye'}`} />
               </button>
             </div>
           </div>
 
-          <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'center', minHeight: 65 }}>
+          <div className="turnstile-dock">
             <div ref={tcRef} />
           </div>
 
           <button type="submit" className="btn-submit" disabled={loading}>
             {loading ? (
               <>
-                <i className="fa-solid fa-spinner fa-spin" /> <span>Memproses...</span>
+                <i className="fa-solid fa-spinner fa-spin" /> <span>Memverifikasi...</span>
               </>
             ) : (
               <>
@@ -159,7 +167,17 @@ export default function LoginApp() {
             )}
           </button>
         </form>
+
+        <div className="login-footer">
+          <div className="security-notice">
+            <i className="fa-solid fa-shield-halved" />
+            <span>Sesi Terenkripsi & Dilindungi Cloudflare</span>
+          </div>
+          <p className="footer-copyright">
+            © {new Date().getFullYear()} PTSP Kemenag Barito Utara • Panel v1.0
+          </p>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

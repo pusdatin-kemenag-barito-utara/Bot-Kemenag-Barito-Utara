@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type Config struct {
 
 	// Database
 	DatabaseURL string
+	DirectURL   string
 
 	// Skema Postgres untuk tabel bot (wa_contacts, wa_message_logs, dll).
 	Schema string
@@ -46,9 +48,26 @@ type Config struct {
 // Load membaca konfigurasi dari environment. Mengembalikan error bila ada
 // variabel wajib (required) yang kosong atau tidak valid.
 func Load() (*Config, error) {
+	directURL := getEnv("DIRECT_URL", os.Getenv("DATABASE_URL"))
+	if strings.Contains(directURL, ":5432") && !strings.Contains(directURL, "sslmode=") {
+		delim := "?"
+		if strings.Contains(directURL, "?") {
+			delim = "&"
+		}
+		directURL += delim + "sslmode=disable"
+	}
+	if directURL != "" && !strings.Contains(directURL, "search_path") {
+		delim := "?"
+		if strings.Contains(directURL, "?") {
+			delim = "&"
+		}
+		directURL += delim + "options=-c%20search_path%3D" + getEnv("DB_SCHEMA", "kemenag_bot") + "%2C" + getEnv("OUTBOX_SCHEMA", "kemenag_ptsp") + "%2Cpublic"
+	}
+
 	cfg := &Config{
 		Port:             getEnv("PORT", "8080"),
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
+		DirectURL:        directURL,
 		Schema:           getEnv("DB_SCHEMA", "kemenag_bot"),
 		OutboxSchema:     getEnv("OUTBOX_SCHEMA", "kemenag_ptsp"),
 		SessionSecret:    os.Getenv("SESSION_SECRET"),
@@ -57,7 +76,7 @@ func Load() (*Config, error) {
 		AdminPassword:     os.Getenv("ADMIN_PASSWORD"),
 		APIKey:           os.Getenv("API_KEY"),
 		TurnstileSecret:  os.Getenv("TURNSTILE_SECRET_KEY"),
-		TurnstileSiteKey: os.Getenv("TURNSTILE_SITE_KEY"),
+		TurnstileSiteKey: getEnv("TURNSTILE_SITE_KEY", os.Getenv("NEXT_PUBLIC_TURNSTILE_SITE_KEY")),
 		MaxDailyOutbound: getEnvInt("MAX_DAILY_OUTBOUND", 1500),
 		FloodWindow:      10 * time.Second,
 		FloodMaxMessages: 5,

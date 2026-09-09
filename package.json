@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "install:all": "npm install && npm --prefix frontend install",
     "dev": "node scripts/dev.mjs",
     "dev:backend": "cd backend && air",
     "dev:frontend": "npm --prefix frontend run dev",
