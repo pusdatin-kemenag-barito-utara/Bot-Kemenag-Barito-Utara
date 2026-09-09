@@ -65,7 +65,11 @@ backend/tmp/
 *.swp
 *.swo
 
-# AI Assistants & Temporary Scripts
+# AI Assistants & Rules & Temporary Scripts
+.agents/
+_agents/
+.agent/
+_agent/
 .claude/
 .opencode/
 .antigravitycli/
