@@ -1,5 +1,5 @@
 // Package config memuat semua konfigurasi aplikasi dari environment variable
-// (termasuk yang disuntikkan oleh Infisical) dan menyediakannya secara terpusat.
+// dan menyediakannya secara terpusat.
 package config
 
 import (

@@ -29,8 +29,8 @@ import (
 )
 
 func main() {
-	// Muat .env bila ada (opsional; prod memakai env dari Infisical).
-	_ = godotenv.Load()
+	// Muat .env bila ada (misal di mode development lokal).
+	_ = godotenv.Load("../.env", ".env")
 
 	cfg, err := config.Load()
 	if err != nil {

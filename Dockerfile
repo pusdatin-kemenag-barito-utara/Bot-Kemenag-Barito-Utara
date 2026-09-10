@@ -15,6 +15,16 @@ WORKDIR /fe
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
+ARG PUBLIC_TURNSTILE_SITE_KEY
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
+ARG PUBLIC_PUSDATIN_URL
+ARG PUBLIC_PUSDATIN_APP_ID
+
+ENV PUBLIC_TURNSTILE_SITE_KEY=$PUBLIC_TURNSTILE_SITE_KEY
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
+ENV PUBLIC_PUSDATIN_URL=$PUBLIC_PUSDATIN_URL
+ENV PUBLIC_PUSDATIN_APP_ID=$PUBLIC_PUSDATIN_APP_ID
+
 COPY frontend/ .
 RUN npm run build
 
@@ -37,8 +47,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tzdata curl bash && \
-    curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.alpine.sh' | bash && \
-    apk add --no-cache infisical && \
     adduser -D -u 10001 appuser
 
 WORKDIR /app

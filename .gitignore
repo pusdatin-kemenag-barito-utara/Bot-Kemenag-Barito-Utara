@@ -1,12 +1,18 @@
-# Dependencies
+# Dependencies & Package Manager Caches
 node_modules/
 frontend/node_modules/
+.npm/
+.pnpm-store/
 
 # Frontend build artifacts (dibuild oleh Dockerfile / CI, bukan di-commit)
+.astro/
 frontend/.astro/
+dist/
 frontend/dist/
 backend/web/public/
 web/public/
+*.tsbuildinfo
+*.timestamp-*
 
 # Go Binaries & Build Artifacts
 *.exe
@@ -22,6 +28,8 @@ bin/
 backend/bin/
 *.test
 *.out
+*.prof
+coverage/
 coverage.txt
 
 # WhatsApp Session & Credentials (VITAL: Berisi token/kredensial sesi WA)
@@ -31,7 +39,7 @@ auth_info_baileys/
 session/
 backend/session/
 
-# Environment Variables & Secrets (100% dikelola via Infisical)
+# Environment Variables & Secrets (Lokal .env)
 .env
 .env*
 .env.local

@@ -1,6 +1,5 @@
 # =============================================================
 # PTSP WhatsApp Bot — Docker Compose (backend Go + frontend Astro)
-# Dipakai dev agar env diisi sederhana; prod memakai Infisical.
 # Build context = root repo (backend/ + frontend/).
 # =============================================================
 services:

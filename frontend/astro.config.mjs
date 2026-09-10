@@ -39,6 +39,7 @@ export default defineConfig({
   compressHTML: true,
   server: { port: 3000 },
   vite: {
+    envDir: '..',
     plugins: [devPageLog()],
     server: {
       proxy: {

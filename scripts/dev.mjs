@@ -2,6 +2,17 @@ import concurrently from 'concurrently';
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import path from 'node:path';
+import fs from 'node:fs';
+
+// Muat file .env root secara otomatis untuk mode dev lokal
+const envFile = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(envFile) && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile(envFile);
+  } catch (err) {
+    console.warn('\x1b[33m[Dev Runner] Peringatan membaca .env:\x1b[0m', err.message);
+  }
+}
 
 const RESET = '\x1b[0m';
 const DIM = '\x1b[2m';
@@ -23,7 +34,7 @@ function banner() {
   print(CYAN, '   UI    : http://localhost:3000        (Astro / React)');
   print(CYAN, '   API   : http://127.0.0.1:8080        (Go Fiber v3 + Air Live Reload)');
   print(CYAN, '   Proxy : /api dan /ws  ->  backend :8080   (hanya mode dev)');
-  print(CYAN, '   DB    : DATABASE_URL (env dari Infisical)');
+  print(CYAN, '   DB    : DATABASE_URL (.env lokal)');
   print(YELLOW, '   Log   : [FE] Halaman UI  |  [BE] API Endpoint (Status & Latensi)');
   print(CYAN + BOLD, '================================================================');
   print(DIM, '   Ctrl+C  -> menghentikan backend & frontend bersamaan.');
@@ -127,7 +138,7 @@ async function main() {
       .slice(0, 3)
       .join('; ');
     print(RED, `\n  Proses dev berhenti — periksa log di atas.${detail ? ` (${detail})` : ''}`);
-    print(RED, '  Tips: jalankan dengan `infisical run -- npm run dev` agar env DATABASE_URL, SESSION_SECRET, dll. tersedia.');
+    print(RED, '  Tips: pastikan file .env lokal terisi dengan benar (DATABASE_URL, SESSION_SECRET, dll.).');
     commands.forEach((c) => c.kill?.());
     process.exitCode = 1;
   }
