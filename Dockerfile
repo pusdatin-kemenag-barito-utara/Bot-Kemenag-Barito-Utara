@@ -47,6 +47,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
 FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tzdata curl bash && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.alpine.sh' | bash && \
+    apk add --no-cache infisical && \
     adduser -D -u 10001 appuser
 
 WORKDIR /app

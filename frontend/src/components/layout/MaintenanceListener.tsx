@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 
-const PUSDATIN_URL =
-  import.meta.env.PUBLIC_PUSDATIN_URL || "https://pusdatin.kemenag-baritoutara.com";
-const APP_ID = import.meta.env.PUBLIC_PUSDATIN_APP_ID || "bot-kemenag";
+const PUSDATIN_URL = import.meta.env.PUBLIC_PUSDATIN_URL;
+const APP_ID = import.meta.env.PUBLIC_PUSDATIN_APP_ID;
 const CHECK_INTERVAL = 15_000;
 
 export function MaintenanceListener() {
   useEffect(() => {
+    if (!PUSDATIN_URL || !APP_ID) return;
     async function checkStatus() {
       try {
         const res = await fetch(

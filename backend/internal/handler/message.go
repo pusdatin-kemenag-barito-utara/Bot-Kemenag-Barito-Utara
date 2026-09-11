@@ -1,14 +1,11 @@
 // Package handler berisi logika domain: pemrosesan pesan masuk, pengiriman
-// keluar, polling outbox, dan integrasi webhook n8n.
+// keluar, dan polling outbox.
 package handler
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -36,7 +33,6 @@ type MessageHandler struct {
 	WA        Manager
 	Guard     *anti_ban.Guard
 	Humanize  *anti_ban.Humanizer
-	N8NURL    string
 	OnNew     func(payload any) // broadcast ke WebSocket clients
 	seenMu    sync.Mutex
 	processed map[string]struct{}
@@ -44,13 +40,12 @@ type MessageHandler struct {
 
 // NewMessageHandler membuat handler dengan dependensi yang sudah disuntik.
 func NewMessageHandler(store *dbstore.Store, waClient Manager, guard *anti_ban.Guard,
-	human *anti_ban.Humanizer, n8nURL string) *MessageHandler {
+	human *anti_ban.Humanizer) *MessageHandler {
 	return &MessageHandler{
 		Store:     store,
 		WA:        waClient,
 		Guard:     guard,
 		Humanize:  human,
-		N8NURL:    n8nURL,
 		processed: make(map[string]struct{}),
 	}
 }
@@ -183,7 +178,24 @@ func (h *MessageHandler) handleIncoming(evt *events.Message) {
 		return
 	}
 
-	// 7. Menu Layanan PTSP Dinamis (langsung membaca kemenag_ptsp.ptsp_services)
+	// 7. Pengecekan Jam Operasional Kantor PTSP (Office Hours):
+	// Khusus di luar jam operasional (Senin-Kamis setelah 16.00, Jumat setelah 16.30, atau akhir pekan/libur):
+	// - JANGAN tampilkan menu angka ataupun kata kunci otomatis.
+	// - Kirimkan notifikasi 1 kali saja bahwa kantor tutup dan pesan akan dibalas saat jam kerja.
+	// - Jika pemohon membalas lagi di sesi luar jam kerja yang sama, JANGAN ditanggapi otomatis lagi (biarkan saja).
+	now := time.Now()
+	if inHours, reason := anti_ban.IsWithinOfficeHours(now); !inHours {
+		log.Printf("[Office Hours] Pesan dari %s diterima di luar jam operasional (%s)", chatJID, reason)
+		if anti_ban.ShouldSendOutOfOfficeNotice(chatJID, now) {
+			oooMsg := anti_ban.BuildOutOfOfficeMessage(name)
+			h.sendReplyAsync(oooMsg, info.Sender, chatJID)
+		} else {
+			log.Printf("[Office Hours] Pemohon %s sudah menerima notifikasi di luar jam kerja untuk sesi ini. Dibiarkan tanpa balasan otomatis.", chatJID)
+		}
+		return
+	}
+
+	// 8. Menu Layanan PTSP Dinamis (langsung membaca kemenag_ptsp.ptsp_services)
 	if menuReply, handled, shouldMute := HandleDynamicPTSPMenu(ctx, h.Store, text, senderJID, name); handled && menuReply != nil {
 		botCtrl.ResetFallback(chatJID)
 		if shouldMute {
@@ -193,7 +205,7 @@ func (h *MessageHandler) handleIncoming(evt *events.Message) {
 		return
 	}
 
-	// 8. Kata Kunci Spesifik dari tabel wa_auto_replies
+	// 9. Kata Kunci Spesifik dari tabel wa_auto_replies
 	reply, err := h.Store.AutoReplies.Match(ctx, text)
 	if err != nil {
 		log.Printf("[DB] Gagal cek auto-reply: %v", err)
@@ -202,17 +214,6 @@ func (h *MessageHandler) handleIncoming(evt *events.Message) {
 		botCtrl.ResetFallback(chatJID)
 		h.sendReplyAsync(*reply, info.Sender, chatJID)
 		return
-	}
-
-	// 9. Jam Operasional Kantor PTSP (Office Hours):
-	// Jika di luar jam kerja Kemenag (Senin-Jumat WIB), kirim pesan sopan (maks 1x per 12 jam per kontak)
-	now := time.Now()
-	if inHours, _ := anti_ban.IsWithinOfficeHours(now); !inHours {
-		if anti_ban.ShouldSendOutOfOfficeNotice(chatJID, now) {
-			oooMsg := anti_ban.BuildOutOfOfficeMessage(name)
-			h.sendReplyAsync(oooMsg, info.Sender, chatJID)
-			return
-		}
 	}
 
 	// 10. Pencegahan Loop / Fallback Limit (Maksimal 3x pesan tak dikenal berturut-turut)
@@ -233,9 +234,6 @@ func (h *MessageHandler) handleIncoming(evt *events.Message) {
 		h.sendReplyAsync(fallbackMsg, info.Sender, chatJID)
 		return
 	}
-
-	// 11. Webhook n8n.
-	h.sendToN8N(ctx, chatJID, text, MessageTypeOf(evt.Message), ts)
 }
 
 // sendReplyAsync mengirimkan balasan secara asinkron dengan simulasi kehadiran manusia.
@@ -261,31 +259,6 @@ func (h *MessageHandler) sendReplyAsync(replyText string, sender types.JID, targ
 			})
 		}
 	}()
-}
-
-// SendToN8N memanggil webhook n8n dan mencatat log.
-func (h *MessageHandler) sendToN8N(ctx context.Context, sender, text, msgType string, ts int64) {
-	if h.N8NURL == "" {
-		return
-	}
-	start := time.Now()
-	payload := map[string]any{
-		"sender":      sender,
-		"message":     text,
-		"messageType": msgType,
-		"timestamp":   ts,
-	}
-
-	statusCode, body, err := postJSON(ctx, h.N8NURL, payload, 10*time.Second)
-	duration := int(time.Since(start).Milliseconds())
-
-	if err != nil {
-		_ = h.Store.WebhookLogs.InsertError(ctx, sender, text, msgType, statusCode, err.Error(), duration)
-		log.Printf("[Webhook] Gagal: %v", err)
-		return
-	}
-	_ = h.Store.WebhookLogs.Insert(ctx, sender, text, msgType, statusCode, string(body), duration)
-	log.Printf("[Webhook] Dikirim ke n8n dari %s (%d)", sender, statusCode)
 }
 
 // handleHistorySync mencatat kontak & pesan dari riwayat yang disinkronkan.
@@ -427,32 +400,6 @@ func MessageTypeOf(m *waProto.Message) string {
 	default:
 		return "unknown"
 	}
-}
-
-// postJSON mengirim HTTP POST JSON dan mengembalikan (status, body, err).
-func postJSON(ctx context.Context, url string, payload any, timeout time.Duration) (int, []byte, error) {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return 0, nil, err
-	}
-	c, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(c, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return 0, nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer resp.Body.Close()
-
-	buf := new(bytes.Buffer)
-	_, _ = buf.ReadFrom(resp.Body)
-	return resp.StatusCode, buf.Bytes(), nil
 }
 
 // FormatPhoneNumber menyamakan format nomor seperti versi Node.

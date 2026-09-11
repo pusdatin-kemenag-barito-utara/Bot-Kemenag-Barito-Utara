@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react';
 import { api, type Contact } from '../../lib/api';
 import { formatContactName, formatDate, formatPhoneJID, initialOf } from '../../lib/format';
 
-export default function ContactsPanel() {
+interface Props {
+  onOpenChat?: (jid: string) => void;
+}
+
+export default function ContactsPanel({ onOpenChat }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     loadContacts();
@@ -37,6 +43,45 @@ export default function ContactsPanel() {
       (qClean.length >= 3 && (phoneClean.includes(qClean) || rawJid.includes(qClean)))
     );
   });
+
+  // Hitung data pagination
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+  const startIndex = (activePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedContacts = filtered.slice(startIndex, endIndex);
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setCurrentPage(1);
+  }
+
+  function getPageNumbers() {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (activePage <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (activePage >= totalPages - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        pages.push(activePage - 1);
+        pages.push(activePage);
+        pages.push(activePage + 1);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  }
 
   return (
     <div className="card-panel">
@@ -99,12 +144,12 @@ export default function ContactsPanel() {
             style={{ paddingLeft: 34, paddingRight: search ? 30 : 12, fontSize: 12.5 }}
             placeholder="Cari nama / nomor pemohon..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
           {search && (
             <button
               type="button"
-              onClick={() => setSearch('')}
+              onClick={() => handleSearchChange('')}
               style={{
                 position: 'absolute',
                 right: 10,
@@ -127,11 +172,11 @@ export default function ContactsPanel() {
         <table className="custom-table">
           <thead>
             <tr>
-              <th style={{ width: 36 }}>No</th>
+              <th style={{ width: 44 }}>No</th>
               <th>Pemohon</th>
               <th className="col-hide-mobile">Nomor WhatsApp</th>
               <th className="col-hide-mobile">Waktu Terdaftar</th>
-              <th style={{ width: 75, textAlign: 'right' }}>Aksi</th>
+              <th style={{ width: 90, textAlign: 'right' }}>Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -150,12 +195,13 @@ export default function ContactsPanel() {
                 </td>
               </tr>
             ) : (
-              filtered.map((c, idx) => {
+              paginatedContacts.map((c, idx) => {
                 const cleanName = formatContactName(c.name, c.remote_jid);
+                const contactIndex = startIndex + idx + 1;
 
                 return (
                   <tr key={c.id || c.remote_jid}>
-                    <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{idx + 1}</td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{contactIndex}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div
@@ -178,7 +224,7 @@ export default function ContactsPanel() {
                         <div style={{ minWidth: 0, overflow: 'hidden' }}>
                           <div style={{ fontWeight: 700, color: '#fff', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cleanName}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            ID: #{c.id || idx + 1}{cleanName === formatPhoneJID(c.remote_jid) ? ' • Kontak WA' : ''}
+                            ID: #{c.id || contactIndex}{cleanName === formatPhoneJID(c.remote_jid) ? ' • Kontak WA' : ''}
                           </div>
                           {cleanName !== formatPhoneJID(c.remote_jid) && (
                             <div className="col-show-mobile" style={{ fontSize: 11, color: '#38bdf8', fontFamily: 'monospace', marginTop: 1 }}>
@@ -210,10 +256,9 @@ export default function ContactsPanel() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <a
-                        href={`https://wa.me/${c.remote_jid.replace(/@.*/, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => onOpenChat?.(c.remote_jid)}
                         className="btn-secondary btn-icon-mobile"
                         style={{
                           display: 'inline-flex',
@@ -221,12 +266,16 @@ export default function ContactsPanel() {
                           gap: 6,
                           fontSize: 11.5,
                           padding: '6px 12px',
+                          cursor: 'pointer',
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          borderColor: 'rgba(16, 185, 129, 0.35)',
+                          color: '#a7f3d0',
                         }}
-                        title="Buka percakapan langsung di WhatsApp Web"
+                        title="Buka percakapan langsung di Log & Live Chat Bot"
                       >
                         <i className="fa-brands fa-whatsapp" style={{ color: 'var(--accent-emerald-light)' }} />
                         <span className="btn-label-desktop">Chat WA</span>
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 );
@@ -235,6 +284,64 @@ export default function ContactsPanel() {
           </tbody>
         </table>
       </div>
+
+      {/* Kontrol Pagination 10 Nomor / Halaman */}
+      {!loading && totalItems > 0 && (
+        <div className="table-pagination">
+          <div className="pagination-info">
+            Menampilkan <span className="highlight">{startIndex + 1}</span> -{' '}
+            <span className="highlight">{endIndex}</span> dari{' '}
+            <span className="highlight">{totalItems}</span> pemohon
+            {search && <span className="filtered-tag">(hasil filter)</span>}
+          </div>
+
+          <div className="pagination-controls">
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={activePage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              title="Halaman sebelumnya"
+            >
+              <i className="fa-solid fa-chevron-left" />
+              <span className="btn-label-desktop">Sebelumnya</span>
+            </button>
+
+            <div className="pagination-numbers">
+              {getPageNumbers().map((p, pIdx) => {
+                if (typeof p === 'string') {
+                  return (
+                    <span key={`dots-${pIdx}`} className="pagination-dots">
+                      {p}
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`pagination-num-btn ${activePage === p ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="pagination-btn"
+              disabled={activePage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              title="Halaman berikutnya"
+            >
+              <span className="btn-label-desktop">Berikutnya</span>
+              <i className="fa-solid fa-chevron-right" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

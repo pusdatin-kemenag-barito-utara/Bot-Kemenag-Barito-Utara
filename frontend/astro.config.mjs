@@ -37,15 +37,14 @@ export default defineConfig({
   outDir: fileURLToPath(new URL('../backend/web/public', import.meta.url)),
   integrations: [react()],
   compressHTML: true,
-  server: { port: 3000 },
+  server: { port: Number(process.env.FRONTEND_PORT || 3000) },
   vite: {
-    envDir: '..',
     plugins: [devPageLog()],
     server: {
       proxy: {
-        // Dev: browser bicara ke :3000, API & WS dilewatkan ke backend Go :8080.
+        // Dev: browser bicara ke frontend dev port, API & WS dilewatkan ke backend Go
         '/api': {
-          target: 'http://127.0.0.1:8080',
+          target: process.env.BACKEND_PROXY_TARGET || process.env.API_PROXY_TARGET || ('http://127.0.0.1:' + (process.env.BACKEND_PORT || process.env.PORT || '8080')),
           changeOrigin: true,
           headers: {
             Connection: 'close',
@@ -74,7 +73,7 @@ export default defineConfig({
           },
         },
         '/ws': {
-          target: 'ws://127.0.0.1:8080',
+          target: process.env.WS_PROXY_TARGET || ('ws://127.0.0.1:' + (process.env.BACKEND_PORT || process.env.PORT || '8080')),
           ws: true,
           changeOrigin: true,
           configure: (proxy) => {

@@ -6,7 +6,6 @@ require (
 	github.com/fasthttp/websocket v1.5.8
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.3
 	github.com/valyala/fasthttp v1.74.0
 	go.mau.fi/whatsmeow v0.0.0-20260904121843-28bfe537ea6a

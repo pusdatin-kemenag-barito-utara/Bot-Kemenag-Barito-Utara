@@ -1,7 +1,6 @@
 ---
-const pusdatinUrl =
-  import.meta.env.PUBLIC_PUSDATIN_URL ||
-  "https://pusdatin.kemenag-baritoutara.com";
+const pusdatinUrl = import.meta.env.PUBLIC_PUSDATIN_URL || "";
+const appId = import.meta.env.PUBLIC_PUSDATIN_APP_ID || "";
 ---
 
 <!DOCTYPE html>
@@ -9,6 +8,8 @@ const pusdatinUrl =
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="pusdatin-url" content={pusdatinUrl} />
+    <meta name="pusdatin-app-id" content={appId} />
     <title>Sistem Sedang Pemeliharaan — Bot PTSP Kemenag Barito Utara</title>
     <link rel="icon" href="/logo.kemenag.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -137,10 +138,11 @@ const pusdatinUrl =
     )}
 
     <script is:inline>
-      const PUSDATIN_URL = "https://pusdatin.kemenag-baritoutara.com";
-      const APP_ID = "bot-kemenag";
+      const PUSDATIN_URL = document.querySelector('meta[name="pusdatin-url"]')?.getAttribute('content') || '';
+      const APP_ID = document.querySelector('meta[name="pusdatin-app-id"]')?.getAttribute('content') || '';
 
       async function checkRestored() {
+        if (!PUSDATIN_URL || !APP_ID) return;
         try {
           const res = await fetch(PUSDATIN_URL + "/api/public/apps/" + APP_ID + "/status?_t=" + Date.now());
           if (res.ok) {
@@ -153,8 +155,10 @@ const pusdatinUrl =
         } catch (_) {}
       }
 
-      setInterval(checkRestored, 10000);
-      window.addEventListener("focus", checkRestored);
+      if (PUSDATIN_URL && APP_ID) {
+        setInterval(checkRestored, 10000);
+        window.addEventListener("focus", checkRestored);
+      }
     </script>
   </body>
 </html>

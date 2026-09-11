@@ -9,10 +9,14 @@ services:
       dockerfile: Dockerfile
     container_name: ptsp-wa-bot-backend
     restart: unless-stopped
-    env_file:
-      - .env
     ports:
       - "8080:8080"
     environment:
-      PORT: "8080"
+      PORT: ${PORT:-8080}
+      INFISICAL_API_URL: ${INFISICAL_API_URL:-https://app.infisical.com/api}
+      INFISICAL_PROJECT_ID: ${INFISICAL_PROJECT_ID}
+      INFISICAL_CLIENT_ID: ${INFISICAL_CLIENT_ID}
+      INFISICAL_CLIENT_SECRET: ${INFISICAL_CLIENT_SECRET}
+      INFISICAL_SECRET_PATH: ${INFISICAL_SECRET_PATH:-/bot-kemenag}
+      INFISICAL_ENV: ${INFISICAL_ENV:-dev}
     # Data sesi WA disimpan di Postgres (sqlstore), bukan volume lokal.

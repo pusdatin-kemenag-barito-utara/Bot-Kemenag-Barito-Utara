@@ -22,7 +22,6 @@ type Store struct {
 	Contacts    *ContactStore
 	Messages    *MessageStore
 	Outbox      *OutboxStore
-	WebhookLogs *WebhookLogStore
 	AutoReplies *AutoReplyStore
 	Services    *ServiceStore
 }
@@ -37,7 +36,6 @@ func New(pool *pgxpool.Pool, schema, outboxSchema string) *Store {
 	s.Contacts = &ContactStore{store: s}
 	s.Messages = &MessageStore{store: s}
 	s.Outbox = &OutboxStore{store: s}
-	s.WebhookLogs = &WebhookLogStore{store: s}
 	s.AutoReplies = &AutoReplyStore{store: s}
 	s.Services = &ServiceStore{store: s}
 	return s

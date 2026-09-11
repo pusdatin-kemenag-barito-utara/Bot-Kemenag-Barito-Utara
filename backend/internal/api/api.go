@@ -20,28 +20,28 @@ type WA interface {
 	IsConnected() bool
 	Connect() error
 	SendText(ctx context.Context, jid types.JID, text string) (string, error)
+	SendDocument(ctx context.Context, jid types.JID, data []byte, fileName, mimeType, caption string) (string, error)
+	SendImage(ctx context.Context, jid types.JID, data []byte, mimeType, caption string) (string, error)
 	Logout(ctx context.Context) error
 }
 
 // Handler mewadahi dependensi seluruh API handler.
 type Handler struct {
-	Store  *dbstore.Store
-	Cfg    *config.Config
-	Auth   *auth.Manager
-	WA     WA
-	OnNew  func(payload any) // broadcast WebSocket
-	N8NURL string
+	Store *dbstore.Store
+	Cfg   *config.Config
+	Auth  *auth.Manager
+	WA    WA
+	OnNew func(payload any) // broadcast WebSocket
 }
 
 // New membuat Handler API dengan injeksi dependensi.
 func New(store *dbstore.Store, cfg *config.Config, a *auth.Manager, waClient WA, onNew func(any)) *Handler {
 	return &Handler{
-		Store:  store,
-		Cfg:    cfg,
-		Auth:   a,
-		WA:     waClient,
-		OnNew:  onNew,
-		N8NURL: cfg.N8NWebhookURL,
+		Store: store,
+		Cfg:   cfg,
+		Auth:  a,
+		WA:    waClient,
+		OnNew: onNew,
 	}
 }
 
@@ -80,6 +80,8 @@ func (h *Handler) Route(app *fiber.App) {
 	sec.Get("/contacts/top", h.GetTopContacts)
 	sec.Get("/chats", h.GetChats)
 	sec.Get("/chats/:jid/messages", h.GetChatMessages)
+	sec.Post("/chats/:jid/media", h.SendChatMedia)
+	sec.Post("/send-media", h.SendChatMedia)
 	sec.Get("/chats/:jid/bot-status", h.GetBotChatStatus)
 	sec.Post("/chats/:jid/bot-toggle", h.ToggleBotChat)
 	sec.Delete("/chats/:jid", h.DeleteChat)
@@ -89,9 +91,6 @@ func (h *Handler) Route(app *fiber.App) {
 	sec.Post("/auto-replies", h.SaveAutoReply)
 	sec.Delete("/auto-replies/:id", h.DeleteAutoReply)
 	sec.Post("/auto-replies/sync", h.SyncAutoReplies)
-
-	sec.Post("/webhook/test", h.TestWebhook)
-	sec.Get("/webhook/logs", h.GetWebhookLogs)
 
 	sec.Post("/logout", h.LogoutWa)
 }

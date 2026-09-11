@@ -14,7 +14,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/static"
-	"github.com/joho/godotenv"
 	"github.com/kemenag/ptsp-wa-bot/backend/internal/anti_ban"
 	"github.com/kemenag/ptsp-wa-bot/backend/internal/api"
 	"github.com/kemenag/ptsp-wa-bot/backend/internal/auth"
@@ -29,9 +28,6 @@ import (
 )
 
 func main() {
-	// Muat .env bila ada (misal di mode development lokal).
-	_ = godotenv.Load("../.env", ".env")
-
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("[Config] %v", err)
@@ -81,7 +77,7 @@ func main() {
 	hub := ws.New()
 
 	// --- Domain handlers ---
-	msgHandler := handler.NewMessageHandler(store, manager, guard, human, cfg.N8NWebhookURL)
+	msgHandler := handler.NewMessageHandler(store, manager, guard, human)
 	msgHandler.OnNew = func(payload any) {
 		hub.Send("message", payload)
 	}

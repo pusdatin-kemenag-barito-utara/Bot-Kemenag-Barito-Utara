@@ -40,9 +40,6 @@ type Config struct {
 	FloodMaxMessages int
 	HumanizeMinDelay time.Duration
 	HumanizeMaxDelay time.Duration
-
-	// Integrations
-	N8NWebhookURL string
 }
 
 // Load membaca konfigurasi dari environment. Mengembalikan error bila ada
@@ -82,15 +79,20 @@ func Load() (*Config, error) {
 		FloodMaxMessages: 5,
 		HumanizeMinDelay: 1500 * time.Millisecond,
 		HumanizeMaxDelay: 4000 * time.Millisecond,
-		N8NWebhookURL:    os.Getenv("N8N_WEBHOOK_URL"),
 	}
 
-	// Validasi wajib untuk keamanan: tanpa secret yang kuat tidak boleh berjalan.
-	if cfg.SessionSecret == "" {
-		return nil, fmt.Errorf("SESSION_SECRET wajib diisi (tidak ada fallback demi keamanan)")
+	// Validasi wajib untuk keamanan: seluruh nilai wajib berasal dari environment variable.
+	if cfg.DatabaseURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL wajib diisi dari environment variable")
 	}
-	if cfg.AdminPasswordHash == "" {
-		return nil, fmt.Errorf("ADMIN_PASSWORD_HASH wajib diisi")
+	if cfg.SessionSecret == "" {
+		return nil, fmt.Errorf("SESSION_SECRET wajib diisi dari environment variable")
+	}
+	if cfg.AdminPasswordHash == "" && cfg.AdminPassword == "" {
+		return nil, fmt.Errorf("ADMIN_PASSWORD_HASH atau ADMIN_PASSWORD wajib diisi dari environment variable")
+	}
+	if cfg.AdminUsername == "" {
+		return nil, fmt.Errorf("ADMIN_USERNAME wajib diisi dari environment variable")
 	}
 
 	return cfg, nil

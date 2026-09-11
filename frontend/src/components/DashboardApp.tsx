@@ -8,10 +8,9 @@ import {
   ChatsPanel,
   ContactsPanel,
   AutoRepliesPanel,
-  WebhooksPanel,
 } from './panels';
 
-type Tab = 'dashboard' | 'chats' | 'contacts' | 'autoreply' | 'webhooks';
+type Tab = 'dashboard' | 'chats' | 'contacts' | 'autoreply';
 
 interface TabConfig {
   key: Tab;
@@ -45,12 +44,6 @@ const TABS: TabConfig[] = [
     title: 'Kata Kunci Otomatis',
     desc: 'Pengaturan respon instan otomatis berbasis kata kunci pesan masuk',
   },
-  {
-    key: 'webhooks',
-    icon: 'fa-diagram-project',
-    title: 'n8n Webhook',
-    desc: 'Log integrasi otomatisasi workflow dan pertukaran payload n8n',
-  },
 ];
 
 export default function DashboardApp() {
@@ -59,10 +52,17 @@ export default function DashboardApp() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [chatTargetJid, setChatTargetJid] = useState<string | null>(null);
   const bot = useBotState();
   const status = stateLabel(bot);
   const { statMessages, statContacts, statAutoReplies, refresh: refreshStats } = useStats();
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+
+  function handleOpenChat(jid: string) {
+    setChatTargetJid(jid);
+    setTab('chats');
+    setSidebarOpen(false);
+  }
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -328,13 +328,14 @@ export default function DashboardApp() {
               <ChatsPanel
                 onStatsChange={refreshStats}
                 refreshTick={refreshTick}
+                targetJid={chatTargetJid}
+                onClearTargetJid={() => setChatTargetJid(null)}
               />
             )}
-            {tab === 'contacts' && <ContactsPanel />}
+            {tab === 'contacts' && <ContactsPanel onOpenChat={handleOpenChat} />}
             {tab === 'autoreply' && (
               <AutoRepliesPanel onChanged={() => setRefreshTick((t) => t + 1)} />
             )}
-            {tab === 'webhooks' && <WebhooksPanel />}
           </div>
         </main>
 

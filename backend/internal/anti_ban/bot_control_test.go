@@ -54,38 +54,53 @@ func TestBotControl(t *testing.T) {
 }
 
 func TestOfficeHours(t *testing.T) {
-	// Buat waktu hari Rabu jam 10:00 WIB (harus dalam jam kerja)
 	wib := time.FixedZone("WIB", 7*3600)
-	wednesday10AM := time.Date(2026, 9, 9, 10, 0, 0, 0, wib)
+	now := time.Now().In(wib)
+
+	// Hitung hari Rabu terdekat secara dinamis dari tanggal, bulan, dan tahun saat ini (dinamis untuk tahun berapapun)
+	daysToWed := (int(time.Wednesday) - int(now.Weekday()) + 7) % 7
+	wednesday := now.AddDate(0, 0, daysToWed)
+	wednesday10AM := time.Date(wednesday.Year(), wednesday.Month(), wednesday.Day(), 10, 0, 0, 0, wib)
+
 	inHours, reason := IsWithinOfficeHours(wednesday10AM)
 	if !inHours {
 		t.Errorf("expected Rabu 10:00 WIB within office hours, got false (%s)", reason)
 	}
 
-	// Buat waktu hari Minggu jam 10:00 WIB (libur)
-	sunday10AM := time.Date(2026, 9, 13, 10, 0, 0, 0, wib)
+	// Hitung hari Minggu terdekat secara dinamis
+	daysToSun := (int(time.Sunday) - int(now.Weekday()) + 7) % 7
+	if daysToSun == 0 {
+		daysToSun = 7
+	}
+	sunday := now.AddDate(0, 0, daysToSun)
+	sunday10AM := time.Date(sunday.Year(), sunday.Month(), sunday.Day(), 10, 0, 0, 0, wib)
+
 	inHours, reason = IsWithinOfficeHours(sunday10AM)
 	if inHours {
 		t.Errorf("expected Minggu outside office hours, got true")
 	}
 
-	// Buat waktu hari Rabu jam 21:00 WIB (malam)
-	wednesday9PM := time.Date(2026, 9, 9, 21, 0, 0, 0, wib)
+	// Buat waktu hari Rabu malam jam 21:00 WIB (malam di luar jam kerja)
+	wednesday9PM := time.Date(wednesday.Year(), wednesday.Month(), wednesday.Day(), 21, 0, 0, 0, wib)
 	inHours, reason = IsWithinOfficeHours(wednesday9PM)
 	if inHours {
 		t.Errorf("expected malam outside office hours, got true")
 	}
 
-	// Test Out of office notice limiter
+	// Test Out of office notice limiter (1x per off-hours session)
+	ResetOutOfOfficeNotice()
 	jid := "628999999999@s.whatsapp.net"
-	now := time.Now()
-	if !ShouldSendOutOfOfficeNotice(jid, now) {
+	if !ShouldSendOutOfOfficeNotice(jid, wednesday9PM) {
 		t.Errorf("first notice should be allowed")
 	}
-	if ShouldSendOutOfOfficeNotice(jid, now.Add(1*time.Hour)) {
-		t.Errorf("second notice within 12 hours should be rejected")
+	if ShouldSendOutOfOfficeNotice(jid, wednesday9PM.Add(1*time.Hour)) {
+		t.Errorf("second notice in same off-hours cycle should be rejected")
 	}
-	if !ShouldSendOutOfOfficeNotice(jid, now.Add(13*time.Hour)) {
-		t.Errorf("notice after 13 hours should be allowed")
+
+	// Kamis malam (siklus berikutnya) secara dinamis
+	thursday := wednesday.AddDate(0, 0, 1)
+	thursday9PM := time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 21, 0, 0, 0, wib)
+	if !ShouldSendOutOfOfficeNotice(jid, thursday9PM) {
+		t.Errorf("notice in next off-hours cycle should be allowed")
 	}
 }

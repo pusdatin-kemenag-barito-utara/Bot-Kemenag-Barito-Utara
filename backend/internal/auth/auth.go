@@ -159,7 +159,10 @@ func (m *Manager) Login(c fiber.Ctx) error {
 		adminUser = u
 	}
 	if adminUser == "" {
-		adminUser = "admin"
+		log.Printf("[Auth] ADMIN_USERNAME belum diatur di environment variable.")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false, "message": "Konfigurasi username admin belum diatur di environment variable.",
+		})
 	}
 
 	usernameMatch := strings.EqualFold(username, adminUser)

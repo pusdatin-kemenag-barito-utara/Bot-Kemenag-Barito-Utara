@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
@@ -297,6 +299,75 @@ func (m *Manager) SendText(ctx context.Context, jid types.JID, text string) (str
 	})
 	if err != nil {
 		return "", err
+	}
+	return resp.ID, nil
+}
+
+// SendDocument mengunggah berkas ke server WhatsApp secara langsung dan mengirimkannya sebagai DocumentMessage.
+// Berkas murni diunggah ke WhatsApp CDN tanpa disimpan di penyimpanan lokal bot.
+func (m *Manager) SendDocument(ctx context.Context, jid types.JID, data []byte, fileName, mimeType, caption string) (string, error) {
+	if !m.IsConnected() {
+		return "", errors.New("WhatsApp belum terhubung")
+	}
+
+	uploaded, err := m.Client.Upload(ctx, data, whatsmeow.MediaDocument)
+	if err != nil {
+		return "", fmt.Errorf("gagal mengunggah dokumen ke server WhatsApp: %w", err)
+	}
+
+	docMsg := &waE2E.DocumentMessage{
+		URL:           proto.String(uploaded.URL),
+		DirectPath:    proto.String(uploaded.DirectPath),
+		MediaKey:      uploaded.MediaKey,
+		Mimetype:      proto.String(mimeType),
+		FileEncSHA256: uploaded.FileEncSHA256,
+		FileSHA256:    uploaded.FileSHA256,
+		FileLength:    proto.Uint64(uploaded.FileLength),
+		FileName:      proto.String(fileName),
+	}
+	if strings.TrimSpace(caption) != "" {
+		docMsg.Caption = proto.String(caption)
+	}
+
+	resp, err := m.Client.SendMessage(ctx, jid, &waE2E.Message{
+		DocumentMessage: docMsg,
+	})
+	if err != nil {
+		return "", fmt.Errorf("gagal mengirim pesan dokumen: %w", err)
+	}
+	return resp.ID, nil
+}
+
+// SendImage mengunggah gambar ke server WhatsApp secara langsung dan mengirimkannya sebagai ImageMessage.
+// Berkas murni diunggah ke WhatsApp CDN tanpa disimpan di penyimpanan lokal bot.
+func (m *Manager) SendImage(ctx context.Context, jid types.JID, data []byte, mimeType, caption string) (string, error) {
+	if !m.IsConnected() {
+		return "", errors.New("WhatsApp belum terhubung")
+	}
+
+	uploaded, err := m.Client.Upload(ctx, data, whatsmeow.MediaImage)
+	if err != nil {
+		return "", fmt.Errorf("gagal mengunggah gambar ke server WhatsApp: %w", err)
+	}
+
+	imgMsg := &waE2E.ImageMessage{
+		URL:           proto.String(uploaded.URL),
+		DirectPath:    proto.String(uploaded.DirectPath),
+		MediaKey:      uploaded.MediaKey,
+		Mimetype:      proto.String(mimeType),
+		FileEncSHA256: uploaded.FileEncSHA256,
+		FileSHA256:    uploaded.FileSHA256,
+		FileLength:    proto.Uint64(uploaded.FileLength),
+	}
+	if strings.TrimSpace(caption) != "" {
+		imgMsg.Caption = proto.String(caption)
+	}
+
+	resp, err := m.Client.SendMessage(ctx, jid, &waE2E.Message{
+		ImageMessage: imgMsg,
+	})
+	if err != nil {
+		return "", fmt.Errorf("gagal mengirim pesan gambar: %w", err)
 	}
 	return resp.ID, nil
 }

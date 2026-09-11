@@ -57,13 +57,6 @@ export interface AutoReply {
   updated_at?: string;
 }
 
-export interface WebhookLog {
-  id: number;
-  sender_jid?: string;
-  response_code?: number;
-  created_at: string;
-}
-
 export interface ChartPoint {
   date: string;
   inbound: number;
@@ -166,10 +159,23 @@ export const api = {
   deleteAutoReply: (id: number) => del(`/api/auto-replies/${id}`),
   syncAutoReplies: () => post<{ success: boolean; message: string }>('/api/auto-replies/sync'),
 
-  webhookLogs: () => get<{ success: boolean; data: WebhookLog[] }>('/api/webhook/logs'),
-  testWebhook: () => post<{ success: boolean; message: string }>('/api/webhook/test'),
-
   send: (to: string, text: string) => post<{ success: boolean; message?: string }>('/api/send', { to, text }),
+  sendChatMedia: async (jid: string, file: File, caption?: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (caption) formData.append('caption', caption);
+    const res = await fetch(`/api/chats/${encodeURIComponent(jid)}/media`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: formData,
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || `Gagal mengirim media (HTTP ${res.status})`);
+    }
+    return res.json() as Promise<{ success: boolean; message: string; file_name?: string }>;
+  },
   connectWa: () => post<{ success: boolean; message?: string }>('/api/connect'),
   logoutWa: () => post<{ success: boolean; message?: string }>('/api/logout'),
 };

@@ -2,6 +2,8 @@
 import DashboardApp from '../components/DashboardApp';
 import MaintenanceListener from '../components/layout/MaintenanceListener';
 import '../styles/global.css';
+
+const cfBeaconToken = import.meta.env.PUBLIC_CF_BEACON_TOKEN || "";
 ---
 
 <!DOCTYPE html>
@@ -9,6 +11,7 @@ import '../styles/global.css';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="cf-beacon-token" content={cfBeaconToken} />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -61,10 +64,12 @@ import '../styles/global.css';
       // Cloudflare Real User Monitoring (RUM) & Core Web Vitals Beacon
       (function() {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return;
+        var token = document.querySelector('meta[name="cf-beacon-token"]')?.getAttribute('content');
+        if (!token) return;
         var cfScript = document.createElement('script');
         cfScript.defer = true;
         cfScript.src = 'https://static.cloudflareinsights.com/beacon.min.js';
-        cfScript.setAttribute('data-cf-beacon', '{"token": "ptsp-kemenag-baritoutara"}');
+        cfScript.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
         document.head.appendChild(cfScript);
       })();
       if (sessionStorage.getItem("is_maintenance") === "true") {

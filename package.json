@@ -5,6 +5,7 @@
   "scripts": {
     "install:all": "npm install && npm --prefix frontend install",
     "dev": "node scripts/dev.mjs",
+    "dev:prod": "node scripts/dev.mjs --prod",
     "dev:backend": "cd backend && air",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",

@@ -2,17 +2,6 @@ import concurrently from 'concurrently';
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import path from 'node:path';
-import fs from 'node:fs';
-
-// Muat file .env root secara otomatis untuk mode dev lokal
-const envFile = path.resolve(process.cwd(), '.env');
-if (fs.existsSync(envFile) && typeof process.loadEnvFile === 'function') {
-  try {
-    process.loadEnvFile(envFile);
-  } catch (err) {
-    console.warn('\x1b[33m[Dev Runner] Peringatan membaca .env:\x1b[0m', err.message);
-  }
-}
 
 const RESET = '\x1b[0m';
 const DIM = '\x1b[2m';
@@ -26,15 +15,89 @@ function print(color, text) {
   console.log(`${color}${text}${RESET}`);
 }
 
-function banner() {
+let INFISICAL_API_URL = process.env.INFISICAL_API_URL || process.env.INFISICAL_HOST_URL || 'https://app.infisical.com/api';
+let INFISICAL_PROJECT_ID = process.env.INFISICAL_PROJECT_ID;
+let INFISICAL_CLIENT_ID = process.env.INFISICAL_CLIENT_ID || process.env.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID;
+let INFISICAL_CLIENT_SECRET = process.env.INFISICAL_CLIENT_SECRET || process.env.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET;
+let INFISICAL_SECRET_PATH = process.env.INFISICAL_SECRET_PATH || '/bot-kemenag';
+
+// Deteksi dinamis kredensial dari profil pengguna jika sesi shell belum me-refresh environment
+if (!INFISICAL_CLIENT_ID || !INFISICAL_CLIENT_SECRET || !INFISICAL_PROJECT_ID) {
+  try {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const cfgPath = path.join(os.homedir(), '.gemini', 'config', 'mcp_config.json');
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      const iEnv = cfg?.mcpServers?.infisical?.env;
+      if (iEnv) {
+        INFISICAL_API_URL = INFISICAL_API_URL || iEnv.INFISICAL_API_URL || iEnv.INFISICAL_HOST_URL;
+        INFISICAL_PROJECT_ID = INFISICAL_PROJECT_ID || iEnv.INFISICAL_PROJECT_ID;
+        INFISICAL_CLIENT_ID = INFISICAL_CLIENT_ID || iEnv.INFISICAL_CLIENT_ID || iEnv.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID;
+        INFISICAL_CLIENT_SECRET = INFISICAL_CLIENT_SECRET || iEnv.INFISICAL_CLIENT_SECRET || iEnv.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET;
+      }
+    }
+  } catch {
+    /* abaikan jika file konfigurasi tidak ada */
+  }
+}
+
+const args = process.argv.slice(2);
+const isProd = args.includes('--prod') || args.includes('--env=prod') || process.env.INFISICAL_ENV === 'prod';
+const targetEnv = isProd ? 'prod' : (process.env.INFISICAL_ENV || 'dev');
+
+async function fetchSecrets(env) {
+  print(CYAN, `[Infisical] Mengautentikasi ke Infisical Cloud (${INFISICAL_API_URL})...`);
+  let token = process.env.INFISICAL_TOKEN;
+  if (!token) {
+    const loginRes = await fetch(`${INFISICAL_API_URL}/v1/auth/universal-auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: INFISICAL_CLIENT_ID,
+        clientSecret: INFISICAL_CLIENT_SECRET,
+      }),
+    });
+    if (!loginRes.ok) {
+      throw new Error(`Login Universal Auth gagal: HTTP ${loginRes.status} ${await loginRes.text()}`);
+    }
+    const loginData = await loginRes.json();
+    token = loginData.accessToken;
+  }
+
+  print(CYAN, `[Infisical] Mengunduh secrets dari folder '${INFISICAL_SECRET_PATH}' (env: ${env})...`);
+  const url = `${INFISICAL_API_URL}/v3/secrets/raw?environment=${encodeURIComponent(env)}&workspaceId=${encodeURIComponent(INFISICAL_PROJECT_ID)}&secretPath=${encodeURIComponent(INFISICAL_SECRET_PATH)}`;
+  const secRes = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!secRes.ok) {
+    throw new Error(`Gagal mengambil secret Infisical: HTTP ${secRes.status} ${await secRes.text()}`);
+  }
+
+  const secData = await secRes.json();
+  const secrets = {};
+  if (Array.isArray(secData.secrets)) {
+    for (const s of secData.secrets) {
+      if (s.secretKey) {
+        secrets[s.secretKey] = s.secretValue ?? '';
+      }
+    }
+  }
+
+  print(GREEN, `[Infisical] \u2714 Berhasil menginjeksi ${Object.keys(secrets).length} secrets dari '${INFISICAL_SECRET_PATH}' [${env}] langsung ke runtime memory!\n`);
+  return secrets;
+}
+
+function banner(env) {
   console.log();
   print(CYAN + BOLD, '================================================================');
   print(CYAN + BOLD, '   Dev Runner — Bot PTSP Kemenag Barito Utara (Air + Astro)');
   print(CYAN + BOLD, '================================================================');
+  print(CYAN, `   Env   : Infisical Cloud [${env.toUpperCase()}] -> /bot-kemenag`);
   print(CYAN, '   UI    : http://localhost:3000        (Astro / React)');
   print(CYAN, '   API   : http://127.0.0.1:8080        (Go Fiber v3 + Air Live Reload)');
   print(CYAN, '   Proxy : /api dan /ws  ->  backend :8080   (hanya mode dev)');
-  print(CYAN, '   DB    : DATABASE_URL (.env lokal)');
   print(YELLOW, '   Log   : [FE] Halaman UI  |  [BE] API Endpoint (Status & Latensi)');
   print(CYAN + BOLD, '================================================================');
   print(DIM, '   Ctrl+C  -> menghentikan backend & frontend bersamaan.');
@@ -62,8 +125,17 @@ function watchReady(cmd, marker, onReady) {
 }
 
 async function main() {
-  banner();
   const started = performance.now();
+  let secrets = {};
+  try {
+    secrets = await fetchSecrets(targetEnv);
+  } catch (err) {
+    print(RED, `\n[Infisical Error] ${err.message}`);
+    print(RED, 'Pastikan koneksi internet aktif dan kredensial Infisical valid.');
+    process.exit(1);
+  }
+
+  banner(targetEnv);
   const done = { be: false, fe: false };
   let commands = [];
 
@@ -81,8 +153,9 @@ async function main() {
         prefixColor: 'yellow.bold',
         env: {
           ...process.env,
+          ...secrets,
           PATH: devPath,
-          PORT: process.env.BACKEND_PORT || '8080',
+          PORT: secrets.BACKEND_PORT || secrets.PORT || '8080',
           LOG_HTTP_REQUESTS: '1',
         },
       },
@@ -93,7 +166,8 @@ async function main() {
         prefixColor: 'cyan.bold',
         env: {
           ...process.env,
-          PORT: process.env.FRONTEND_PORT || '3000',
+          ...secrets,
+          PORT: secrets.FRONTEND_PORT || '3000',
           ASTRO_DEV_BACKGROUND: 'false',
         },
       },
@@ -138,7 +212,6 @@ async function main() {
       .slice(0, 3)
       .join('; ');
     print(RED, `\n  Proses dev berhenti — periksa log di atas.${detail ? ` (${detail})` : ''}`);
-    print(RED, '  Tips: pastikan file .env lokal terisi dengan benar (DATABASE_URL, SESSION_SECRET, dll.).');
     commands.forEach((c) => c.kill?.());
     process.exitCode = 1;
   }
@@ -156,4 +229,4 @@ process.on('SIGINT', () => {
   setTimeout(() => process.exit(130), 1500);
 });
 
-main();
+main();

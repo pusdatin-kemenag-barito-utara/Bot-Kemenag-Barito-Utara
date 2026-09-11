@@ -45,20 +45,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_uniq_msg ON wa_message_logs (remote_jid, i
 CREATE INDEX IF NOT EXISTS idx_wa_msg_logs_timestamp ON wa_message_logs (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_wa_msg_logs_remote_jid ON wa_message_logs (remote_jid);
 
--- Tabel log webhook (wa_webhook_logs).
-CREATE TABLE IF NOT EXISTS wa_webhook_logs (
-    id SERIAL PRIMARY KEY,
-    remote_jid TEXT,
-    message TEXT,
-    message_type TEXT,
-    status_code INT,
-    response TEXT,
-    duration_ms INT,
-    error TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_wa_webhook_logs_created ON wa_webhook_logs (created_at DESC);
-
 -- Tabel auto-reply (wa_auto_replies).
 CREATE TABLE IF NOT EXISTS wa_auto_replies (
     id SERIAL PRIMARY KEY,

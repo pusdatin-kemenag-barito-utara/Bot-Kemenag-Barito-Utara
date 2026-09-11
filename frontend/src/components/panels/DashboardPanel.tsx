@@ -412,8 +412,8 @@ export default function DashboardPanel({
                 <span style={{ fontWeight: 600, color: 'var(--accent-emerald-light)' }}>Go Fiber v3 + whatsmeow</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Workflow Automation</span>
-                <span style={{ fontWeight: 600, color: '#60a5fa' }}>n8n PTSP Webhook</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Respon Otomatis</span>
+                <span style={{ fontWeight: 600, color: 'var(--accent-amber)' }}>Katalog Layanan & Kata Kunci</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Anti-Ban Guard</span>

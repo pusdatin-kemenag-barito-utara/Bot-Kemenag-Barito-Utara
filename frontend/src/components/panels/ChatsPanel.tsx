@@ -5,6 +5,8 @@ import { formatChatTime, formatContactName, formatPhoneJID, formatWaText, initia
 interface Props {
   onStatsChange: () => Promise<void>;
   refreshTick: number;
+  targetJid?: string | null;
+  onClearTargetJid?: () => void;
 }
 
 // Menghasilkan warna avatar yang konsisten berdasarkan nama
@@ -24,7 +26,67 @@ function getAvatarGradient(name: string): string {
   return gradients[Math.abs(hash) % gradients.length];
 }
 
-export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
+function parseMediaContent(content: string) {
+  if (!content) return null;
+  const docMatch = content.match(/^\[Dokumen:\s*([^\]]+)\]\s*([\s\S]*)$/i);
+  if (docMatch) {
+    return {
+      isDocument: true,
+      fileName: docMatch[1].trim(),
+      caption: docMatch[2].trim(),
+    };
+  }
+  const imgMatch = content.match(/^\[(?:Media:\s*)?Gambar\]\s*([\s\S]*)$/i);
+  if (imgMatch) {
+    return {
+      isImage: true,
+      caption: imgMatch[1].trim(),
+    };
+  }
+  return null;
+}
+
+function getDocBadgeClass(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  switch (ext) {
+    case 'pdf': return 'badge-pdf';
+    case 'doc':
+    case 'docx': return 'badge-word';
+    case 'xls':
+    case 'xlsx': return 'badge-excel';
+    case 'ppt':
+    case 'pptx': return 'badge-ppt';
+    default: return 'badge-file';
+  }
+}
+
+function getDocExtLabel(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toUpperCase() || 'FILE';
+  return ext.length > 4 ? ext.slice(0, 4) : ext;
+}
+
+function getDocFaIcon(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  switch (ext) {
+    case 'pdf': return 'fa-solid fa-file-pdf';
+    case 'doc':
+    case 'docx': return 'fa-solid fa-file-word';
+    case 'xls':
+    case 'xlsx': return 'fa-solid fa-file-excel';
+    case 'ppt':
+    case 'pptx': return 'fa-solid fa-file-powerpoint';
+    default: return 'fa-solid fa-file-lines';
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+export default function ChatsPanel({ onStatsChange, refreshTick, targetJid, onClearTargetJid }: Props) {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [selected, setSelected] = useState<ChatSummary | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -34,9 +96,48 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [botMuted, setBotMuted] = useState(false);
   const [togglingBot, setTogglingBot] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [hasNewBelow, setHasNewBelow] = useState(false);
 
-  // Sinkronisasi realtime: polling tiap 3 detik hanya saat tab aktif agar terminal tidak spam
+  // State untuk Lampiran Berkas (WhatsApp Web Attachment)
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [mediaCaption, setMediaCaption] = useState('');
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const imgInputRef = useRef<HTMLInputElement>(null);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const shouldScrollToBottomRef = useRef(true);
+
+  function scrollToBottom(smooth = false) {
+    if (!listRef.current) return;
+    if (smooth) {
+      listRef.current.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+    } else {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+    isNearBottomRef.current = true;
+    setShowScrollBottom(false);
+    setHasNewBelow(false);
+  }
+
+  function handleScroll() {
+    if (!listRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const isAtBottom = distanceFromBottom <= 90;
+
+    isNearBottomRef.current = isAtBottom;
+    setShowScrollBottom(!isAtBottom);
+    if (isAtBottom) {
+      setHasNewBelow(false);
+    }
+  }
+
+  // Sinkronisasi realtime: polling tiap 3 detik hanya saat tab aktif
   useEffect(() => {
     void fetchChats();
     const interval = setInterval(() => {
@@ -44,7 +145,20 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
       void fetchChats();
       if (selected) {
         void api.chatMessages(selected.remote_jid).then((res) => {
-          if (res.data) setMessages(res.data);
+          if (!res.data) return;
+          setMessages((prev) => {
+            if (prev.length === res.data.length) {
+              const lastP = prev[prev.length - 1];
+              const lastN = res.data[res.data.length - 1];
+              if (lastP?.id === lastN?.id && lastP?.content === lastN?.content) {
+                return prev;
+              }
+            }
+            if (res.data.length > prev.length && !isNearBottomRef.current) {
+              setHasNewBelow(true);
+            }
+            return res.data;
+          });
         }).catch(() => {});
       }
     }, 3000);
@@ -54,7 +168,20 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
         void fetchChats();
         if (selected) {
           void api.chatMessages(selected.remote_jid).then((res) => {
-            if (res.data) setMessages(res.data);
+            if (!res.data) return;
+            setMessages((prev) => {
+              if (prev.length === res.data.length) {
+                const lastP = prev[prev.length - 1];
+                const lastN = res.data[res.data.length - 1];
+                if (lastP?.id === lastN?.id && lastP?.content === lastN?.content) {
+                  return prev;
+                }
+              }
+              if (res.data.length > prev.length && !isNearBottomRef.current) {
+                setHasNewBelow(true);
+              }
+              return res.data;
+            });
           }).catch(() => {});
         }
       }
@@ -71,16 +198,39 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
     void fetchChats();
     if (selected) {
       void api.chatMessages(selected.remote_jid).then((res) => {
-        if (res.data) setMessages(res.data);
+        if (!res.data) return;
+        setMessages((prev) => {
+          if (prev.length === res.data.length) {
+            const lastP = prev[prev.length - 1];
+            const lastN = res.data[res.data.length - 1];
+            if (lastP?.id === lastN?.id && lastP?.content === lastN?.content) {
+              return prev;
+            }
+          }
+          if (res.data.length > prev.length && !isNearBottomRef.current) {
+            setHasNewBelow(true);
+          }
+          return res.data;
+        });
       }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
 
   useEffect(() => {
-    if (messages.length > 0 && listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
+    if (messages.length === 0 || !listRef.current) return;
+
+    if (shouldScrollToBottomRef.current) {
+      scrollToBottom(false);
+      shouldScrollToBottomRef.current = false;
+      return;
     }
+
+    // Hanya auto-scroll jika pengguna memang sedang berada di paling bawah
+    if (isNearBottomRef.current) {
+      scrollToBottom(false);
+    }
+    // Jika pengguna sedang membaca di atas, biarkan posisi scroll tetap di sana
   }, [messages]);
 
   async function fetchChats() {
@@ -94,6 +244,10 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
 
   async function selectChat(c: ChatSummary) {
     setSelected(c);
+    shouldScrollToBottomRef.current = true;
+    isNearBottomRef.current = true;
+    setShowScrollBottom(false);
+    setHasNewBelow(false);
     setLoadingMessages(true);
     void api.getBotChatStatus(c.remote_jid).then((st) => {
       setBotMuted(st.is_muted);
@@ -108,6 +262,47 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
       setLoadingMessages(false);
     }
   }
+
+  // Auto-select obrolan jika dialihkan dari panel lain (misal dari Daftar Pemohon)
+  useEffect(() => {
+    if (!targetJid) return;
+
+    const existing = chats.find((c) => c.remote_jid === targetJid);
+    if (existing) {
+      void selectChat(existing);
+      onClearTargetJid?.();
+    } else {
+      api
+        .chats()
+        .then((res) => {
+          const list = res.data || [];
+          setChats(list);
+          const found = list.find((c) => c.remote_jid === targetJid);
+          if (found) {
+            void selectChat(found);
+          } else {
+            void selectChat({
+              remote_jid: targetJid,
+              name: '',
+              last_message: '',
+              last_time: Math.floor(Date.now() / 1000),
+            });
+          }
+        })
+        .catch(() => {
+          void selectChat({
+            remote_jid: targetJid,
+            name: '',
+            last_message: '',
+            last_time: Math.floor(Date.now() / 1000),
+          });
+        })
+        .finally(() => {
+          onClearTargetJid?.();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetJid]);
 
   async function toggleBot() {
     if (!selected || togglingBot) return;
@@ -140,6 +335,7 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
     setDraft('');
     setSending(true);
     setBotMuted(true); // Otomatis admin takeover
+    setTimeout(() => scrollToBottom(true), 50);
 
     try {
       const res = await api.send(selected.remote_jid, text);
@@ -175,6 +371,97 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
       void onStatsChange();
     } catch {
       alert('Gagal menghapus percakapan');
+    }
+  }
+
+  // Tutup menu popover lampiran saat klik di luar area
+  useEffect(() => {
+    if (!showAttachMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.chat-attach-wrapper')) {
+        setShowAttachMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAttachMenu]);
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>, isImage: boolean) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert('Ukuran berkas melebihi batas maksimal 15 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setSelectedFile(file);
+    setMediaCaption('');
+
+    if (isImage) {
+      const url = URL.createObjectURL(file);
+      setFilePreviewUrl(url);
+    } else {
+      setFilePreviewUrl(null);
+    }
+    e.target.value = '';
+  }
+
+  function closeMediaPreview() {
+    if (uploadingMedia) return;
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    setMediaCaption('');
+  }
+
+  async function handleSendMedia() {
+    if (!selected || !selectedFile || uploadingMedia) return;
+    setUploadingMedia(true);
+
+    const isImage = selectedFile.type.startsWith('image/') ||
+      /\.(jpg|jpeg|png|webp)$/i.test(selectedFile.name);
+    const tempId = Date.now();
+    const captionText = mediaCaption.trim();
+
+    const optimisticContent = isImage
+      ? (captionText ? `[Media: Gambar] ${captionText}` : '[Media: Gambar]')
+      : (captionText ? `[Dokumen: ${selectedFile.name}] ${captionText}` : `[Dokumen: ${selectedFile.name}]`);
+
+    const optimisticMsg: Message = {
+      id: tempId,
+      remote_jid: selected.remote_jid,
+      is_from_me: true,
+      message_type: isImage ? 'imageMessage' : 'documentMessage',
+      content: optimisticContent,
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setBotMuted(true);
+    closeMediaPreview();
+    setTimeout(() => scrollToBottom(true), 60);
+
+    try {
+      const res = await api.sendChatMedia(selected.remote_jid, selectedFile, captionText);
+      if (!res.success) {
+        alert('Gagal mengirim berkas: ' + (res.message || ''));
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        return;
+      }
+      const updated = await api.chatMessages(selected.remote_jid);
+      if (updated.data) setMessages(updated.data);
+      await fetchChats();
+      void onStatsChange();
+    } catch (err: any) {
+      alert('Gagal mengirim berkas: ' + (err?.message || 'Kesalahan jaringan'));
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+    } finally {
+      setUploadingMedia(false);
     }
   }
 
@@ -369,7 +656,7 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
             </div>
 
             {/* Area Daftar Pesan */}
-            <div className="chat-messages-body" ref={listRef}>
+            <div className="chat-messages-body" ref={listRef} onScroll={handleScroll}>
               {loadingMessages ? (
                 <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
@@ -386,20 +673,128 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
                   </p>
                 </div>
               ) : (
-                messages.map((m) => (
-                  <div key={m.id} className={`bubble ${m.is_from_me ? 'outbound' : 'inbound'}`}>
-                    <div dangerouslySetInnerHTML={{ __html: formatWaText(m.content || '') }} />
-                    <div className="bubble-time">
-                      <span>{formatChatTime(m.timestamp)}</span>
-                      {m.is_from_me && <i className="fa-solid fa-check-double" />}
+                messages.map((m) => {
+                  const media = parseMediaContent(m.content || '');
+                  return (
+                    <div key={m.id} className={`bubble ${m.is_from_me ? 'outbound' : 'inbound'}`}>
+                      {media?.isDocument ? (
+                        <>
+                          <div className="bubble-doc-card">
+                            <div className={`bubble-doc-icon ${getDocBadgeClass(media.fileName)}`}>
+                              <i className={getDocFaIcon(media.fileName)} />
+                              <span className="bubble-doc-ext">{getDocExtLabel(media.fileName)}</span>
+                            </div>
+                            <div className="bubble-doc-info">
+                              <div className="bubble-doc-name">{media.fileName}</div>
+                              <div className="bubble-doc-type">Dokumen WhatsApp</div>
+                            </div>
+                          </div>
+                          {media.caption && (
+                            <div
+                              className="bubble-doc-caption"
+                              dangerouslySetInnerHTML={{ __html: formatWaText(media.caption) }}
+                            />
+                          )}
+                        </>
+                      ) : media?.isImage ? (
+                        <>
+                          <div className="bubble-img-badge">
+                            <i className="fa-solid fa-image" />
+                            <span>Foto / Gambar WhatsApp</span>
+                          </div>
+                          {media.caption && (
+                            <div dangerouslySetInnerHTML={{ __html: formatWaText(media.caption) }} />
+                          )}
+                        </>
+                      ) : (
+                        <div dangerouslySetInnerHTML={{ __html: formatWaText(m.content || '') }} />
+                      )}
+                      <div className="bubble-time">
+                        <span>{formatChatTime(m.timestamp)}</span>
+                        {m.is_from_me && <i className="fa-solid fa-check-double" />}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
+            {/* Tombol Melayang Panah Bawah (Scroll ke Chat Paling Bawah) */}
+            {showScrollBottom && (
+              <button
+                type="button"
+                className="scroll-bottom-btn"
+                onClick={() => scrollToBottom(true)}
+                title="Gulir ke pesan terbaru"
+                aria-label="Ke pesan terbaru"
+              >
+                <i className="fa-solid fa-chevron-down" />
+                {hasNewBelow && <span className="scroll-bottom-badge" title="Pesan baru" />}
+              </button>
+            )}
+
             {/* Input Bar Kirim Pesan */}
             <div className="chat-input-bar">
+              {/* Tombol Lampiran WhatsApp Web */}
+              <div className="chat-attach-wrapper">
+                <button
+                  type="button"
+                  className={`chat-attach-btn ${showAttachMenu ? 'active' : ''}`}
+                  onClick={() => setShowAttachMenu((prev) => !prev)}
+                  title="Lampirkan berkas atau foto"
+                  aria-label="Lampirkan"
+                  disabled={uploadingMedia}
+                >
+                  <i className="fa-solid fa-paperclip" />
+                </button>
+
+                {showAttachMenu && (
+                  <div className="chat-attach-menu">
+                    <button
+                      type="button"
+                      className="chat-attach-item"
+                      onClick={() => {
+                        setShowAttachMenu(false);
+                        docInputRef.current?.click();
+                      }}
+                    >
+                      <div className="chat-attach-item-icon doc">
+                        <i className="fa-solid fa-file-lines" />
+                      </div>
+                      <span>Dokumen (PDF, Word, Excel)</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-attach-item"
+                      onClick={() => {
+                        setShowAttachMenu(false);
+                        imgInputRef.current?.click();
+                      }}
+                    >
+                      <div className="chat-attach-item-icon img">
+                        <i className="fa-solid fa-image" />
+                      </div>
+                      <span>Foto & Gambar</span>
+                    </button>
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  ref={docInputRef}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleFileSelected(e, false)}
+                />
+                <input
+                  type="file"
+                  ref={imgInputRef}
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleFileSelected(e, true)}
+                />
+              </div>
+
               <input
                 type="text"
                 className="search-input"
@@ -408,13 +803,13 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void send()}
-                disabled={sending}
+                disabled={sending || uploadingMedia}
               />
               <button
                 type="button"
                 className="btn-primary"
                 onClick={() => void send()}
-                disabled={sending || !draft.trim()}
+                disabled={sending || uploadingMedia || !draft.trim()}
                 style={{ padding: '9px 14px', borderRadius: 9, flexShrink: 0 }}
                 title="Kirim Pesan"
               >
@@ -422,6 +817,82 @@ export default function ChatsPanel({ onStatsChange, refreshTick }: Props) {
                 <span className="chat-btn-label">{sending ? 'Mengirim...' : 'Kirim'}</span>
               </button>
             </div>
+
+            {/* Modal Pratinjau Lampiran Berkas / Gambar (WhatsApp Web Style) */}
+            {selectedFile && (
+              <div className="modal-overlay" onClick={closeMediaPreview}>
+                <div className="media-preview-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="media-preview-header">
+                    <h3>
+                      <i className="fa-solid fa-paperclip" style={{ marginRight: 8, color: '#34d399' }} />
+                      Kirim Lampiran
+                    </h3>
+                    <button
+                      type="button"
+                      className="media-preview-close"
+                      onClick={closeMediaPreview}
+                      disabled={uploadingMedia}
+                      aria-label="Tutup"
+                    >
+                      <i className="fa-solid fa-xmark" />
+                    </button>
+                  </div>
+
+                  <div className="media-preview-body">
+                    {filePreviewUrl ? (
+                      <img src={filePreviewUrl} alt="Pratinjau Gambar" className="media-preview-img" />
+                    ) : (
+                      <div className="media-preview-doc-card">
+                        <div className={`media-preview-doc-icon ${getDocBadgeClass(selectedFile.name)}`}>
+                          <i className={getDocFaIcon(selectedFile.name)} />
+                          <span>{getDocExtLabel(selectedFile.name)}</span>
+                        </div>
+                        <div className="media-preview-doc-info">
+                          <div className="media-preview-doc-name">{selectedFile.name}</div>
+                          <div className="media-preview-doc-size">{formatFileSize(selectedFile.size)}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <input
+                      type="text"
+                      className="search-input"
+                      style={{ padding: '10px 14px', fontSize: 13 }}
+                      placeholder="Tambah keterangan... (opsional)"
+                      value={mediaCaption}
+                      onChange={(e) => setMediaCaption(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && void handleSendMedia()}
+                      disabled={uploadingMedia}
+                      autoFocus
+                    />
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={closeMediaPreview}
+                        disabled={uploadingMedia}
+                        style={{ padding: '8px 14px', fontSize: 12.5 }}
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => void handleSendMedia()}
+                        disabled={uploadingMedia}
+                        style={{ padding: '8px 16px', fontSize: 12.5, borderRadius: 8 }}
+                      >
+                        <i className={`fa-solid ${uploadingMedia ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`} />
+                        <span>{uploadingMedia ? 'Mengunggah & Mengirim...' : 'Kirim Berkas'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           /* Empty State saat belum ada obrolan yang dipilih */
