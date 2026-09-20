@@ -231,15 +231,15 @@ async function main() {
   const aabFile = files.find((f) => f.endsWith('.aab'));
 
   if (apkFile) {
-    const targetApk = path.join(downloadDir, 'ptsp-kemenag-bot.apk');
+    const targetApk = path.join(downloadDir, 'wa-bot-kemenag.apk');
     fs.copyFileSync(path.join(androidBuildDir, apkFile), targetApk);
-    print(GREEN, `✔ APK siap didistribusikan : frontend/public/download/ptsp-kemenag-bot.apk`);
+    print(GREEN, `✔ APK siap didistribusikan : frontend/public/download/wa-bot-kemenag.apk`);
 
     // Sinkronisasi ke backend static dir jika ada
     if (fs.existsSync(backendWebDir)) {
       const backendDownload = path.join(backendWebDir, 'download');
       fs.mkdirSync(backendDownload, { recursive: true });
-      fs.copyFileSync(targetApk, path.join(backendDownload, 'ptsp-kemenag-bot.apk'));
+      fs.copyFileSync(targetApk, path.join(backendDownload, 'wa-bot-kemenag.apk'));
     }
   }
 
@@ -273,7 +273,7 @@ async function main() {
   print(GREEN + BOLD, '================================================================');
   print(GREEN + BOLD, '   ✔ BUILD APK SELESAI & AMAN DI INFISICAL!                     ');
   print(GREEN + BOLD, '================================================================');
-  print(CYAN, `• Download URL : ${host}/download/ptsp-kemenag-bot.apk`);
+  print(CYAN, `• Download URL : ${host}/download/wa-bot-kemenag.apk`);
   print(CYAN, `• Keystore     : android-build/signing.keystore`);
   print(CYAN, `• Kredensial   : Disimpan aman di Infisical (${INFISICAL_SECRET_PATH})`);
   console.log();

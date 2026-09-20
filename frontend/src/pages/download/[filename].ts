@@ -4,6 +4,7 @@ import path from 'node:path';
 
 export function getStaticPaths() {
   return [
+    { params: { filename: 'wa-bot-kemenag.apk' } },
     { params: { filename: 'ptsp-kemenag-bot.apk' } },
   ];
 }

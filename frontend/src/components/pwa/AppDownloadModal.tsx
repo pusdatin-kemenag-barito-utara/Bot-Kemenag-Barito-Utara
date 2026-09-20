@@ -287,8 +287,8 @@ export function AppDownloadModal({ isOpen, onClose }: AppDownloadModalProps) {
 
               {/* Download Button */}
               <a
-                href="/download/ptsp-kemenag-bot.apk"
-                download="ptsp-kemenag-bot.apk"
+                href="/download/wa-bot-kemenag.apk"
+                download="wa-bot-kemenag.apk"
                 style={{
                   width: '100%',
                   display: 'flex',
@@ -321,7 +321,7 @@ export function AppDownloadModal({ isOpen, onClose }: AppDownloadModalProps) {
                     <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: 700, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       1
                     </span>
-                    <p style={{ margin: 0 }}>Klik tombol unduh di atas untuk mengunduh berkas <code>ptsp-kemenag-bot.apk</code>.</p>
+                    <p style={{ margin: 0 }}>Klik tombol unduh di atas untuk mengunduh berkas <code>wa-bot-kemenag.apk</code>.</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: 700, fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
