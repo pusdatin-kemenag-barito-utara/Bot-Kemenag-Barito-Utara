@@ -139,7 +139,7 @@ export default function LoginApp() {
               decoding="async"
             />
           </div>
-          <h1 className="brand-title">Bot PTSP Kemenag</h1>
+          <h1 className="brand-title">WhatsApp Bot Kemenag</h1>
           <p className="brand-subtitle">Kantor Kementerian Agama Kab. Barito Utara</p>
           <div className="brand-badge-tag">
             <span className="pulse-dot" />
@@ -230,7 +230,7 @@ export default function LoginApp() {
             <span>Sesi Terenkripsi & Dilindungi Cloudflare</span>
           </div>
           <p className="footer-copyright">
-            © {new Date().getFullYear()} PTSP Kemenag Barito Utara • Panel v1.0
+            © {new Date().getFullYear()} WhatsApp Bot Kemenag Barito Utara • Panel v1.0
           </p>
         </div>
       </div>

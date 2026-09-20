@@ -146,7 +146,7 @@ export default function DashboardApp() {
   }
 
   async function handleLogout() {
-    if (!confirm('Keluar dari sesi administrator Bot PTSP Kemenag?')) return;
+    if (!confirm('Keluar dari sesi administrator WhatsApp Bot Kemenag?')) return;
     closeBotSocket();
     try {
       await api.logout();
@@ -174,7 +174,7 @@ export default function DashboardApp() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         {/* Brand Header */}
         <div className="sidebar-brand">
-          <div className="brand-logo" title="PTSP Kemenag Barito Utara">
+          <div className="brand-logo" title="WhatsApp Bot Kemenag Barito Utara">
             <img
               src="/logo.kemenag.svg"
               alt="Kemenag"
@@ -186,7 +186,7 @@ export default function DashboardApp() {
           </div>
           <div className="brand-info">
             <div className="brand-title-wrap">
-              <span className="brand-name">PTSP Kemenag</span>
+              <span className="brand-name">WA Bot Kemenag</span>
               <span className="brand-version-badge">v2.0</span>
             </div>
             <span className="brand-sub">Kab. Barito Utara</span>
@@ -236,7 +236,7 @@ export default function DashboardApp() {
               setSidebarOpen(false);
               setDownloadModalOpen(true);
             }}
-            title="Pasang aplikasi PTSP atau unduh file APK Android"
+            title="Pasang aplikasi WA Bot atau unduh file APK Android"
             style={{ cursor: 'pointer' }}
           >
             <i className="fa-solid fa-mobile-screen-button" style={{ color: '#10b981' }} />
@@ -264,7 +264,7 @@ export default function DashboardApp() {
                 <span className="user-name" title={username}>{username}</span>
                 <span className="user-status-text">
                   <span className="user-online-dot" />
-                  <span>Admin PTSP</span>
+                  <span>Admin WA Bot</span>
                 </span>
               </div>
             </div>
