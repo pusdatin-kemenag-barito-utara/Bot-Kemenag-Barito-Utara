@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppDownloadModal } from './pwa/AppDownloadModal';
 import { api } from '../lib/api';
 import { useBotState } from '../lib/useBot';
 import { useStats } from '../lib/useStats';
@@ -52,6 +53,7 @@ export default function DashboardApp() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [chatTargetJid, setChatTargetJid] = useState<string | null>(null);
   const bot = useBotState();
   const status = stateLabel(bot);
@@ -232,6 +234,18 @@ export default function DashboardApp() {
             className="nav-item"
             onClick={() => {
               setSidebarOpen(false);
+              setDownloadModalOpen(true);
+            }}
+            title="Pasang aplikasi PTSP atau unduh file APK Android"
+            style={{ cursor: 'pointer' }}
+          >
+            <i className="fa-solid fa-mobile-screen-button" style={{ color: '#10b981' }} />
+            <span>Pasang Aplikasi (APK)</span>
+          </a>
+          <a
+            className="nav-item"
+            onClick={() => {
+              setSidebarOpen(false);
               void handleResetWa();
             }}
             title="Hapus sesi perangkat dan minta QR code baru"
@@ -405,6 +419,10 @@ export default function DashboardApp() {
           </button>
         </nav>
       </div>
+      <AppDownloadModal
+        isOpen={downloadModalOpen}
+        onClose={() => setDownloadModalOpen(false)}
+      />
     </div>
   );
 }

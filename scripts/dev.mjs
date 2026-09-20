@@ -20,6 +20,12 @@ let INFISICAL_PROJECT_ID = process.env.INFISICAL_PROJECT_ID;
 let INFISICAL_CLIENT_ID = process.env.INFISICAL_CLIENT_ID || process.env.INFISICAL_UNIVERSAL_AUTH_CLIENT_ID;
 let INFISICAL_CLIENT_SECRET = process.env.INFISICAL_CLIENT_SECRET || process.env.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET;
 let INFISICAL_SECRET_PATH = process.env.INFISICAL_SECRET_PATH || '/bot-kemenag';
+// Sanitasi otomatis jika Git Bash / MSYS mengonversi path menjadi path Windows
+if (INFISICAL_SECRET_PATH.includes(':') || INFISICAL_SECRET_PATH.includes('\\')) {
+  const parts = INFISICAL_SECRET_PATH.replace(/\\/g, '/').split('/');
+  const lastPart = parts.filter(Boolean).pop();
+  INFISICAL_SECRET_PATH = lastPart ? '/' + lastPart : '/bot-kemenag';
+}
 
 // Deteksi dinamis kredensial dari profil pengguna jika sesi shell belum me-refresh environment
 if (!INFISICAL_CLIENT_ID || !INFISICAL_CLIENT_SECRET || !INFISICAL_PROJECT_ID) {

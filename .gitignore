@@ -51,6 +51,7 @@ backend/session/
 *.crt
 *.pfx
 *.p12
+signing-key-info.txt
 
 # Local Database & SQLite
 *.db
@@ -89,3 +90,7 @@ scratch/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Android TWA & Mobile Build Artifacts (Kredensial diamankan di Infisical, folder android-build ditrack di Git)
+android-build.zip
+signing-key-info.txt
