@@ -147,7 +147,7 @@ export function AppDownloadModal({ isOpen, onClose }: AppDownloadModalProps) {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h2 style={{ fontSize: '17px', fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#ffffff' }}>
-                  Pasang Aplikasi Bot PTSP
+                  Pasang WA Bot Kemenag
                 </h2>
                 <span
                   style={{

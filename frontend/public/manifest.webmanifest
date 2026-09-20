@@ -1,7 +1,7 @@
 {
-  "name": "PTSP Kemenag Barito Utara — WhatsApp Gateway",
-  "short_name": "PTSP Kemenag",
-  "description": "Dashboard Pelayanan Terpadu Satu Pintu & WhatsApp Gateway Kantor Kementerian Agama Kabupaten Barito Utara",
+  "name": "WhatsApp Bot Kemenag",
+  "short_name": "WA Bot Kemenag",
+  "description": "WhatsApp Bot Pelayanan Terpadu Satu Pintu Kantor Kementerian Agama Kabupaten Barito Utara",
   "start_url": "/",
   "id": "/",
   "display": "standalone",

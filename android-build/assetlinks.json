@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "com.kemenag_baritoutara.bot.twa",
-        "sha256_cert_fingerprints": ["FE:A4:17:BD:CA:0E:7B:08:8D:51:F3:5A:65:A8:2F:C6:72:C7:0F:21:5F:86:A9:BF:19:8F:87:3B:CD:C7:02:BE"]
+        "sha256_cert_fingerprints": ["D1:81:DE:6C:81:41:EC:C3:DF:CF:5A:9C:E9:D3:F3:C7:F9:FA:65:72:91:AB:39:D8:0A:1B:5E:90:F0:8B:B0:E3"]
       }
     }]

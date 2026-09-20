@@ -112,8 +112,8 @@ async function main() {
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const host = secrets.PWA_HOST || 'https://bot.kemenag-baritoutara.com';
-  const name = manifest.name || 'PTSP Kemenag Barito Utara - WhatsApp Gateway';
-  const launcherName = manifest.short_name || 'PTSP Kemenag';
+  const name = manifest.name || 'WhatsApp Bot Kemenag';
+  const launcherName = manifest.short_name || 'WA Bot Kemenag';
   const packageId = secrets.PWA_PACKAGE_ID || 'com.kemenag_baritoutara.bot.twa';
   const themeColor = manifest.theme_color || '#0d1527';
   const backgroundColor = manifest.background_color || '#0d1527';
